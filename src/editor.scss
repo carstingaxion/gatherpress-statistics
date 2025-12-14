@@ -1,0 +1,18 @@
+/**
+ * The following styles get applied inside the editor only.
+ */
+
+.wp-block-gatherpress-statistics {
+	.gatherpress-stats-preview {
+		border: 2px dashed var(--wp--preset--color--contrast, #000);
+		border-radius: var(--wp--preset--spacing--20, 0.5rem);
+		padding: var(--wp--preset--spacing--40, 1.5rem);
+		opacity: 0.8;
+	}
+
+	&.is-style-card .gatherpress-stats-preview {
+		border-style: solid;
+		border-width: 1px;
+		opacity: 1;
+	}
+}

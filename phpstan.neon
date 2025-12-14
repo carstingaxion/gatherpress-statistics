@@ -18,6 +18,3 @@ parameters:
         analyseAndScan:
             - build/
             - node_modules/
-    ignoreErrors:
-        # Find a nicer way instead of ignoring this Error on every ft-module
-        - '#Function Altis\\register_module not found\.#'

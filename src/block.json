@@ -1,0 +1,144 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "gatherpress/statistics",
+	"version": "0.1.0",
+	"title": "GatherPress Statistics",
+	"category": "widgets",
+	"icon": "chart-bar",
+	"description": "Display dynamically calculated statistics about your GatherPress events with beautiful, cached counters.",
+	"example": {
+		"attributes": {
+			"statisticType": "total_events",
+			"labelSingular": "Event",
+			"labelPlural": "Events",
+			"eventQuery": "past"
+		}
+	},
+	"attributes": {
+		"statisticType": {
+			"type": "string",
+			"default": "total_events"
+		},
+		"labelSingular": {
+			"type": "string",
+			"default": "Event"
+		},
+		"labelPlural": {
+			"type": "string",
+			"default": "Events"
+		},
+		"selectedTaxonomyTerms": {
+			"type": "object",
+			"default": {}
+		},
+		"selectedTerm": {
+			"type": "number",
+			"default": 0
+		},
+		"selectedTaxonomy": {
+			"type": "string",
+			"default": ""
+		},
+		"countTaxonomy": {
+			"type": "string",
+			"default": ""
+		},
+		"filterTaxonomy": {
+			"type": "string",
+			"default": ""
+		},
+		"eventQuery": {
+			"type": "string",
+			"default": "past",
+			"enum": ["upcoming", "past"]
+		},
+		"showLabel": {
+			"type": "boolean",
+			"default": true
+		},
+		"prefixDefault": {
+			"type": "string",
+			"default": ""
+		},
+		"suffixDefault": {
+			"type": "string",
+			"default": ""
+		},
+		"prefixConditional": {
+			"type": "string",
+			"default": ""
+		},
+		"suffixConditional": {
+			"type": "string",
+			"default": ""
+		},
+		"conditionalThreshold": {
+			"type": "number",
+			"default": 10
+		}
+	},
+	"supports": {
+		"html": false,
+		"align": true,
+		"color": {
+			"background": true,
+			"text": true,
+			"gradients": true,
+			"link": true
+		},
+		"spacing": {
+			"padding": true,
+			"margin": true,
+			"blockGap": true
+		},
+		"typography": {
+			"fontSize": true,
+			"lineHeight": true,
+			"__experimentalFontFamily": true,
+			"__experimentalFontWeight": true,
+			"__experimentalFontStyle": true,
+			"__experimentalTextTransform": true,
+			"__experimentalLetterSpacing": true,
+			"__experimentalTextDecoration": true
+		},
+		"shadow": true,
+		"__experimentalBorder": {
+			"color": true,
+			"radius": true,
+			"style": true,
+			"width": true,
+			"__experimentalDefaultControls": {
+				"color": true,
+				"radius": true,
+				"style": true,
+				"width": true
+			}
+		}
+	},
+	"styles": [
+		{
+			"name": "default",
+			"label": "Counter",
+			"isDefault": true
+		},
+		{
+			"name": "card",
+			"label": "Card"
+		},
+		{
+			"name": "minimal",
+			"label": "Minimal"
+		},
+		{
+			"name": "confetti",
+			"label": "Confetti"
+		}
+	],
+	"textdomain": "gatherpress-statistics",
+	"editorScript": "file:./index.js",
+	"editorStyle": "file:./index.css",
+	"style": "file:./style-index.css",
+	"viewScript": "file:./view.js",
+	"render": "file:./render.php"
+}

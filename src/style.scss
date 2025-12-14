@@ -1,0 +1,129 @@
+/**
+ * The following styles get applied both on the front of your site
+ * and in the editor.
+ */
+
+.wp-block-gatherpress-statistics {
+	text-align: center;
+	padding: var(--wp--preset--spacing--40, 1.5rem);
+
+	.gatherpress-stats-number {
+		// font-size: var(--wp--preset--font-size--x-large, 3rem);
+		font-size: 1em;
+		font-weight: 700;
+		// line-height: 1.2;
+		margin-bottom: var(--wp--preset--spacing--20, 0.5rem);
+	}
+
+	.gatherpress-stats-label {
+		// font-size: var(--wp--preset--font-size--medium, 1rem);
+		font-size: .5em;
+		// text-transform: uppercase;
+		// letter-spacing: 0.05em;
+		opacity: 0.8;
+	}
+
+	// Card style variation
+	&.is-style-card {
+		border-radius: var(--wp--preset--spacing--20, 0.5rem);
+		box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+		padding: var(--wp--preset--spacing--50, 2rem);
+		background: var(--wp--preset--color--base, #fff);
+		color: var(--wp--preset--color--contrast, #000);
+
+		.gatherpress-stats-number {
+			// font-size: var(--wp--preset--font-size--xx-large, 4rem);
+			font-size: 1.25em;
+		}
+	}
+
+	// Minimal style variation
+	&.is-style-minimal {
+		padding: var(--wp--preset--spacing--30, 1rem);
+		
+		.gatherpress-stats-number {
+			// font-size: var(--wp--preset--font-size--large, 2rem);
+			font-size: .85em;
+			margin-bottom: var(--wp--preset--spacing--10, 0.25rem);
+		}
+
+		.gatherpress-stats-label {
+			// font-size: var(--wp--preset--font-size--small, 0.875rem);
+			font-size: .65em;
+			// text-transform: none;
+			// letter-spacing: normal;
+		}
+	}
+
+	// Confetti style variation
+	&.is-style-confetti {
+		position: relative;
+		overflow: hidden;
+		border-radius: var(--wp--preset--spacing--30, 1rem);
+		padding: var(--wp--preset--spacing--50, 2rem);
+		background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+		color: #fff;
+		transition: transform 0.3s ease;
+
+		.gatherpress-stats-number {
+			// font-size: var(--wp--preset--font-size--xx-large, 4rem);
+			font-size: 1.25em;
+			color: #fff;
+			position: relative;
+			z-index: 2;
+		}
+
+		.gatherpress-stats-label {
+			color: rgba(255, 255, 255, 0.9);
+			position: relative;
+			z-index: 2;
+		}
+
+		&:hover {
+			transform: scale(1.05);
+		}
+	}
+}
+
+// Confetti animation styles
+.gatherpress-confetti {
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 100%;
+	pointer-events: none;
+	z-index: 1;
+	opacity: 0;
+	transition: opacity 0.3s ease;
+}
+
+.is-style-confetti:hover .gatherpress-confetti {
+	opacity: 1;
+}
+
+.gatherpress-confetti-piece {
+	position: absolute;
+	width: 8px;
+	height: 8px;
+	background: #fff;
+	top: 0;
+	opacity: 0;
+}
+
+@keyframes confetti-fall {
+	0% {
+		top: -10%;
+		opacity: 1;
+		transform: translateX(0) rotateZ(0deg);
+	}
+	100% {
+		top: 110%;
+		opacity: 0;
+		transform: translateX(100px) rotateZ(720deg);
+	}
+}
+
+.is-style-confetti:hover .gatherpress-confetti-piece {
+	animation: confetti-fall 3s ease-out forwards;
+}
