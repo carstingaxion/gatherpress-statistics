@@ -2,15 +2,15 @@
 /**
  * Figuren_Theater ...
  *
- * @package figuren-theater/project_urlname
+ * @package figuren-theater/gatherpress-statistics
  */
 
-namespace Figuren_Theater\project_name;
+namespace Figuren_Theater\gatherpress_statistics;
 
 /**
  * Figuren_Theater ...
  *
- * @package figuren-theater/project_urlname
+ * @package figuren-theater/gatherpress-statistics
  */
 class Example {
 

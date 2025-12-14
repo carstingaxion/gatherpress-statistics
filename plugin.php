@@ -1,15 +1,15 @@
 <?php
 /**
- * Register the project_urlname module to altis
+ * Register the gatherpress-statistics module to altis
  *
- * @package           figuren-theater/project_urlname
+ * @package           figuren-theater/gatherpress-statistics
  * @author            figuren.theater
  * @copyright         2023 figuren.theater
  * @license           GPL-3.0+
  *
  * @wordpress-plugin
- * Plugin Name:       figuren.theater | project_name
- * Plugin URI:        https://github.com/figuren-theater/project_urlname
+ * Plugin Name:       figuren.theater | gatherpress_statistics
+ * Plugin URI:        https://github.com/figuren-theater/gatherpress-statistics
  * Description:       ... like the figuren.theater WordPress Multisite network.
  * Version:           0.1.0-alpha
  * Requires at least: 6.0
@@ -20,10 +20,10 @@
  * Domain Path:       /languages
  * License:           GPL-3.0+
  * License URI:       http://www.gnu.org/licenses/gpl-3.0.txt
- * Update URI:        https://github.com/figuren-theater/project_urlname
+ * Update URI:        https://github.com/figuren-theater/gatherpress-statistics
  */
 
-namespace Figuren_Theater\project_name;
+namespace Figuren_Theater\gatherpress_statistics;
 
 const DIRECTORY = __DIR__;
 
