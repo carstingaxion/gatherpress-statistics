@@ -41,32 +41,30 @@ if ( ! defined( 'ABSPATH' ) ) {
  * @return void
  */
 function register_post_type_support(): void {
-	if ( post_type_exists( 'gatherpress_event' ) ) {
-		// Default configuration with all statistic types enabled
-		$default_config = array(
-			'total_events'                => true,
-			'events_per_taxonomy'         => true,
-			'events_multi_taxonomy'       => false,
-			'total_taxonomy_terms'        => false,
-			'taxonomy_terms_by_taxonomy'  => false,
-			'total_attendees'             => true,
-		);
-		
-		/**
-		 * Filter the statistics support configuration.
-		 *
-		 * Allows developers to enable or disable specific statistic types.
-		 *
-		 * @since 0.1.0
-		 *
-		 * @param array<string, bool> $config Configuration array with statistic type keys and boolean values.
-		 */
-		$config = apply_filters( 'gatherpress_statistics_support_config', $default_config );
-		
-		add_post_type_support( 'gatherpress_event', 'gatherpress_statistics', $config );
-	}
+	// Default configuration with all statistic types enabled
+	$default_config = array(
+		'total_events'                => true,
+		'events_per_taxonomy'         => true,
+		'events_multi_taxonomy'       => false,
+		'total_taxonomy_terms'        => false,
+		'taxonomy_terms_by_taxonomy'  => false,
+		'total_attendees'             => true,
+	);
+	
+	/**
+	 * Filter the statistics support configuration.
+	 *
+	 * Allows developers to enable or disable specific statistic types.
+	 *
+	 * @since 0.1.0
+	 *
+	 * @param array<string, bool> $config Configuration array with statistic type keys and boolean values.
+	 */
+	$config = apply_filters( 'gatherpress_statistics_support_config', $default_config );
+	
+	add_post_type_support( 'gatherpress_event', 'gatherpress_statistics', $config );
 }
-add_action( 'init', __NAMESPACE__ . '\register_post_type_support', 20 );
+add_action( 'registered_post_type_gatherpress_event', __NAMESPACE__ . '\register_post_type_support' );
 
 /**
  * Get the statistics support configuration for a post type.
@@ -865,13 +863,13 @@ function count_attendees( array $filters = array() ): int {
 	if ( empty( $post_types ) ) {
 		return 0;
 	}
-	
 	// Type safety
 	$filters = is_array( $filters ) ? $filters : array();
 	
 	// Build base query arguments
 	$args = array(
 		'post_type'      => $post_types,
+		// 'post_type'      => 'gatherpress_event',
 		'post_status'    => 'publish',
 		'posts_per_page' => -1,
 		'fields'         => 'ids',
@@ -926,7 +924,7 @@ function count_attendees( array $filters = array() ): int {
 	if ( is_array( $query->posts ) && ! empty( $query->posts ) ) {
 		foreach ( $query->posts as $post_id ) {
 			// Get the attendee count for this event
-			$attendee_count = get_post_meta( $post_id, 'gatherpress_attendees_count', true );
+			$attendee_count = (int) get_post_meta( $post_id, 'gatherpress_attendees_count', true );
 			
 			// Add to total if it's a valid number
 			if ( is_numeric( $attendee_count ) ) {
