@@ -19,12 +19,22 @@ namespace GatherPressStatistics;
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
-
 /**
- * Register post type support for gatherpress_statistics.
+ * Register post type support for gatherpress_statistics with granular control.
  *
  * This function adds the 'gatherpress_statistics' support to the 'gatherpress_event'
- * post type by default. Other post types can add this support to enable statistics.
+ * post type by default with all statistic types enabled. Developers can modify
+ * this configuration to enable/disable specific statistic types.
+ *
+ * Example to disable specific statistic types:
+ *
+ * ```php
+ * add_filter( 'gatherpress_statistics_support_config', function( $config ) {
+ *     $config['events_multi_taxonomy'] = false;
+ *     $config['total_taxonomy_terms'] = false;
+ *     return $config;
+ * } );
+ * ```
  *
  * @since 0.1.0
  *
@@ -32,10 +42,111 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 function register_post_type_support(): void {
 	if ( post_type_exists( 'gatherpress_event' ) ) {
-		add_post_type_support( 'gatherpress_event', 'gatherpress_statistics' );
+		// Default configuration with all statistic types enabled
+		$default_config = array(
+			'total_events'                => true,
+			'events_per_taxonomy'         => true,
+			'events_multi_taxonomy'       => false,
+			'total_taxonomy_terms'        => false,
+			'taxonomy_terms_by_taxonomy'  => false,
+			'total_attendees'             => true,
+		);
+		
+		/**
+		 * Filter the statistics support configuration.
+		 *
+		 * Allows developers to enable or disable specific statistic types.
+		 *
+		 * @since 0.1.0
+		 *
+		 * @param array<string, bool> $config Configuration array with statistic type keys and boolean values.
+		 */
+		$config = apply_filters( 'gatherpress_statistics_support_config', $default_config );
+		
+		add_post_type_support( 'gatherpress_event', 'gatherpress_statistics', $config );
 	}
 }
 add_action( 'init', __NAMESPACE__ . '\register_post_type_support', 20 );
+
+/**
+ * Get the statistics support configuration for a post type.
+ *
+ * Retrieves the configuration array that specifies which statistic types
+ * are enabled for a given post type.
+ *
+ * @since 0.1.0
+ *
+ * @param string $post_type Post type slug.
+ * @return array<string, bool> Configuration array, or empty array if not supported.
+ */
+function get_support_config( string $post_type = 'gatherpress_event' ): array {
+	if ( ! post_type_supports( $post_type, 'gatherpress_statistics' ) ) {
+		return array();
+	}
+	
+	// Get the support args (third parameter from add_post_type_support)
+	$supports = get_all_post_type_supports( $post_type );
+	
+	if ( isset( $supports['gatherpress_statistics'] ) && is_array( $supports['gatherpress_statistics'] ) ) {
+		// Return the first element which contains our configuration
+		return reset( $supports['gatherpress_statistics'] );
+	}
+	
+	// Default configuration if none found
+	return array(
+		'total_events'                => true,
+		'events_per_taxonomy'         => true,
+		'events_multi_taxonomy'       => true,
+		'total_taxonomy_terms'        => true,
+		'taxonomy_terms_by_taxonomy'  => true,
+		'total_attendees'             => true,
+	);
+}
+
+/**
+ * Check if a specific statistic type is supported.
+ *
+ * @since 0.1.0
+ *
+ * @param string $statistic_type The statistic type to check.
+ * @param string $post_type      Optional. Post type to check. Default 'gatherpress_event'.
+ * @return bool True if the statistic type is supported, false otherwise.
+ */
+function is_statistic_type_supported( string $statistic_type, string $post_type = 'gatherpress_event' ): bool {
+	$config = get_support_config( $post_type );
+	
+	if ( empty( $config ) ) {
+		return false;
+	}
+	
+	return ! empty( $config[ $statistic_type ] );
+}
+
+/**
+ * Get all supported statistic types for a post type.
+ *
+ * @since 0.1.0
+ *
+ * @param string $post_type Optional. Post type to check. Default 'gatherpress_event'.
+ * @return array<int, string> Array of supported statistic type slugs.
+ */
+function get_supported_statistic_types( string $post_type = 'gatherpress_event' ): array {
+	$config = get_support_config( $post_type );
+	
+	if ( empty( $config ) ) {
+		return array();
+	}
+	
+	// Filter to only enabled types
+	$enabled_types = array();
+	foreach ( $config as $type => $enabled ) {
+		if ( $enabled ) {
+			$enabled_types[] = $type;
+		}
+	}
+	
+	return $enabled_types;
+}
 
 /**
  * Get all post types that support gatherpress_statistics.
@@ -121,28 +232,14 @@ function get_taxonomies(): array {
  * to allow developers to exclude specific taxonomies from statistics generation
  * and block selection.
  *
- * Example usage to exclude post_tag and a custom taxonomy:
+ * By default, the '_gatherpress_venue' taxonomy is excluded.
+ *
+ * Example usage to exclude additional taxonomies:
  *
  * ```php
  * add_filter( 'gatherpress_statistics_excluded_taxonomies', function( $excluded ) {
  *     $excluded[] = 'post_tag';           // Exclude WordPress tags
  *     $excluded[] = 'custom_event_type';  // Exclude custom taxonomy
- *     return $excluded;
- * } );
- * ```
- *
- * Example usage to exclude venue taxonomy from statistics:
- *
- * ```php
- * // Only exclude venues from calculations, but keep in editor
- * add_filter( 'gatherpress_statistics_excluded_taxonomies', function( $excluded ) {
- *     // Don't exclude from editor, handle separately in block registration
- *     return $excluded;
- * } );
- *
- * // Or exclude venues completely from both calculations and editor
- * add_filter( 'gatherpress_statistics_excluded_taxonomies', function( $excluded ) {
- *     $excluded[] = '_gatherpress_venue';
  *     return $excluded;
  * } );
  * ```
@@ -173,7 +270,7 @@ function get_filtered_taxonomies( bool $for_editor = false ): array {
 	 */
 	$excluded_taxonomies = apply_filters(
 		'gatherpress_statistics_excluded_taxonomies',
-		array(),
+		array( '_gatherpress_venue' ),
 		$for_editor
 	);
 	
@@ -259,6 +356,66 @@ function get_cache_key( string $statistic_type, array $filters = array() ): stri
 	return implode( '_', $key_parts );
 }
 
+
+/**
+ * Get cache expiration time in seconds.
+ *
+ * Returns the number of seconds to cache statistics. Default is 12 hours (43200 seconds).
+ * Developers can modify this using the 'gatherpress_statistics_cache_expiration' filter.
+ *
+ * Example usage to set cache to 6 hours:
+ *
+ * ```php
+ * add_filter( 'gatherpress_statistics_cache_expiration', function( $expiration ) {
+ *     return 6 * HOUR_IN_SECONDS; // 6 hours
+ * } );
+ * ```
+ *
+ * Example usage to set cache to 1 hour:
+ *
+ * ```php
+ * add_filter( 'gatherpress_statistics_cache_expiration', function( $expiration ) {
+ *     return HOUR_IN_SECONDS; // 1 hour
+ * } );
+ * ```
+ *
+ * Example usage to set cache to 24 hours:
+ *
+ * ```php
+ * add_filter( 'gatherpress_statistics_cache_expiration', function( $expiration ) {
+ *     return DAY_IN_SECONDS; // 24 hours
+ * } );
+ * ```
+ *
+ * @since 0.1.0
+ *
+ * @return int Cache expiration time in seconds.
+ */
+function get_cache_expiration(): int {
+	/**
+	 * Filter the cache expiration time for statistics.
+	 *
+	 * This filter allows developers to modify how long statistics are cached
+	 * before they need to be recalculated. The default is 12 hours.
+	 *
+	 * @since 0.1.0
+	 *
+	 * @param int $expiration Cache expiration time in seconds. Default 12 hours (43200).
+	 */
+	$expiration = apply_filters(
+		'gatherpress_statistics_cache_expiration',
+		12 * HOUR_IN_SECONDS
+	);
+	
+	// Ensure the value is a positive integer
+	if ( ! is_numeric( $expiration ) || $expiration < 1 ) {
+		$expiration = 12 * HOUR_IN_SECONDS;
+	}
+	
+	return absint( $expiration );
+}
+
+
 /**
  * Calculate statistics based on type and filters.
  *
@@ -266,18 +423,8 @@ function get_cache_key( string $statistic_type, array $filters = array() ): stri
  * functions based on the statistic type requested. All heavy lifting happens
  * here and the results are cached for performance.
  *
- * Supported statistic types:
- * - 'total_events': Count all published events
- * - 'events_per_taxonomy': Count events in a specific taxonomy term
- * - 'events_multi_taxonomy': Count events matching multiple taxonomy filters
- * - 'total_taxonomy_terms': Count total terms in a taxonomy
- * - 'taxonomy_terms_by_taxonomy': Count terms of one taxonomy filtered by another
- * - 'total_attendees': Sum all attendees from event post meta
- *
- * All statistics MUST be filtered by event query type (upcoming/past) using the
- * 'event_query' filter parameter:
- * - 'upcoming': Only count future events
- * - 'past': Only count past events
+ * IMPORTANT: This function checks if the requested statistic type is supported
+ * before performing any calculations.
  *
  * @since 0.1.0
  *
@@ -288,6 +435,11 @@ function get_cache_key( string $statistic_type, array $filters = array() ): stri
 function calculate( string $statistic_type, array $filters = array() ): int {
 	// Verify at least one post type supports statistics
 	if ( ! has_supported_post_types() ) {
+		return 0;
+	}
+	
+	// CRITICAL: Check if this statistic type is supported
+	if ( ! is_statistic_type_supported( $statistic_type ) ) {
 		return 0;
 	}
 	
@@ -334,7 +486,66 @@ function calculate( string $statistic_type, array $filters = array() ): int {
 	// Ensure result is always a non-negative integer
 	$result = is_numeric( $result ) ? absint( $result ) : 0;
 	
-	// Allow developers to filter the calculated result
+
+	/**
+	 * Filter calculated statistics before caching.
+	 *
+	 * This filter allows developers to modify calculated statistics before they
+	 * are cached. Different filters are available for each statistic type:
+	 *
+	 * - gatherpress_stats_calculate_total_events
+	 * - gatherpress_stats_calculate_events_per_taxonomy
+	 * - gatherpress_stats_calculate_events_multi_taxonomy
+	 * - gatherpress_stats_calculate_total_taxonomy_terms
+	 * - gatherpress_stats_calculate_taxonomy_terms_by_taxonomy
+	 * - gatherpress_stats_calculate_total_attendees
+	 *
+	 * Example usage to round count values:
+	 *
+	 * ```php
+	 * // Round counts to nearest 10 when over 50
+	 * add_filter( 'gatherpress_stats_calculate_total_events', function( $count, $filters ) {
+	 *     if ( $count > 50 ) {
+	 *         return round( $count / 10 ) * 10;
+	 *     }
+	 *     return $count;
+	 * }, 10, 2 );
+	 * ```
+	 *
+	 * Example usage to round based on value ranges:
+	 *
+	 * ```php
+	 * add_filter( 'gatherpress_stats_calculate_total_attendees', function( $count, $filters ) {
+	 *     // Round to nearest 5 if between 10-50
+	 *     if ( $count >= 10 && $count <= 50 ) {
+	 *         return round( $count / 5 ) * 5;
+	 *     }
+	 *     // Round to nearest 10 if between 50-100
+	 *     if ( $count > 50 && $count <= 100 ) {
+	 *         return round( $count / 10 ) * 10;
+	 *     }
+	 *     // Round to nearest 50 if over 100
+	 *     if ( $count > 100 ) {
+	 *         return round( $count / 50 ) * 50;
+	 *     }
+	 *     return $count;
+	 * }, 10, 2 );
+	 * ```
+	 *
+	 * Example usage to add a custom multiplier:
+	 *
+	 * ```php
+	 * // Apply a 1.5x multiplier to all event counts
+	 * add_filter( 'gatherpress_stats_calculate_total_events', function( $count, $filters ) {
+	 *     return round( $count * 1.5 );
+	 * }, 10, 2 );
+	 * ```
+	 *
+	 * @since 0.1.0
+	 *
+	 * @param int   $count   The calculated statistic value.
+	 * @param array $filters The filters applied to this statistic.
+	 */
 	return apply_filters( 'gatherpress_stats_calculate_' . $statistic_type, $result, $filters );
 }
 
@@ -385,11 +596,11 @@ function count_events( array $filters = array() ): int {
 	
 	// Build the base query arguments
 	$args = array(
-		#'post_type'      => $post_types,
-		'post_type'      => 'gatherpress_event',
+		#'post_type'      => 'gatherpress_event',
+		'post_type'      => $post_types,
 		'post_status'    => 'publish',
-		'posts_per_page' => -1,        // Get all posts
-		'fields'         => 'ids',     // Only return IDs for performance
+		'posts_per_page' => -1,
+		'fields'         => 'ids',
 	);
 	
 	// CRITICAL: Add GatherPress event query parameter with proper validation
@@ -399,9 +610,6 @@ function count_events( array $filters = array() ): int {
 			$args['gatherpress_event_query'] = $event_query;
 		}
 	}
-	
-	// DEBUG: Log the WP_Query arguments before execution
-	error_log( 'GatherPress Stats - WP_Query args: ' . print_r( $args, true ) );
 	
 	// Handle single taxonomy filter (taxonomy + term_id)
 	if ( ! empty( $filters['taxonomy'] ) && ! empty( $filters['term_id'] ) ) {
@@ -440,10 +648,6 @@ function count_events( array $filters = array() ): int {
 	
 	// Execute the query
 	$query = new \WP_Query( $args );
-	
-	// DEBUG: Log the query results
-	error_log( 'GatherPress Stats - Query found_posts: ' . $query->found_posts );
-	error_log( 'GatherPress Stats - Query request: ' . $query->request );
 	
 	return absint( $query->found_posts );
 }
@@ -773,21 +977,19 @@ function get_cached( string $statistic_type, array $filters = array() ): int {
 		return 0;
 	}
 	
+	// CRITICAL: Check if this statistic type is supported
+	if ( ! is_statistic_type_supported( $statistic_type ) ) {
+		return 0;
+	}
+
+	// Get configured cache expiration time
+	$expiration = get_cache_expiration();
+
 	// Generate unique cache key for this configuration
 	$cache_key = get_cache_key( $statistic_type, $filters );
 	
-	// DEBUG: Log cache key
-	error_log( 'GatherPress Stats - Cache key: ' . $cache_key );
-	
 	// Try to get cached value
 	$cached = get_transient( $cache_key );
-	
-	// DEBUG: Log cache status
-	if ( false !== $cached ) {
-		error_log( 'GatherPress Stats - Cache HIT for key: ' . $cache_key . ', value: ' . $cached );
-	} else {
-		error_log( 'GatherPress Stats - Cache MISS for key: ' . $cache_key );
-	}
 	
 	// Validate cached value and return if valid
 	if ( false !== $cached && is_numeric( $cached ) ) {
@@ -797,15 +999,12 @@ function get_cached( string $statistic_type, array $filters = array() ): int {
 	// Cache miss - calculate the value
 	$value = calculate( $statistic_type, $filters );
 	
-	// DEBUG: Log calculated value
-	error_log( 'GatherPress Stats - Calculated value for key: ' . $cache_key . ', value: ' . $value );
-	
 	// Ensure value is integer
 	$value = is_numeric( $value ) ? absint( $value ) : 0;
 	
-	// Store in cache for 12 hours
+	// Store in cache with configured expiration time
 	// Note: Cache is cleared automatically on data changes
-	set_transient( $cache_key, $value, 12 * HOUR_IN_SECONDS );
+	\set_transient( $cache_key, $value, $expiration );
 	
 	return $value;
 }
@@ -816,6 +1015,9 @@ function get_cached( string $statistic_type, array $filters = array() ): int {
  * Generates an array of common statistic configurations that should be
  * pre-calculated and cached. This is called after cache clearing to ensure
  * frequently-used statistics are immediately available.
+ *
+ * This function respects the statistic type support configuration
+ * and only generates configurations for enabled types.
  *
  * This function respects the taxonomy exclusion filter and will not generate
  * statistics for excluded taxonomies. It generates statistics ONLY for both
@@ -845,19 +1047,31 @@ function get_cached( string $statistic_type, array $filters = array() ): int {
 function get_common_configs(): array {
 	$configs = array();
 	
+	// Get supported statistic types
+	$supported_types = get_supported_statistic_types();
+	
+	if ( empty( $supported_types ) ) {
+		return array();
+	}
+	
 	// Event query types to generate statistics for (ONLY upcoming and past, never empty/all)
 	$event_queries = array( 'upcoming', 'past' );
 	
-	// Basic statistics for each event query type
+	// Basic statistics for each event query type (only if supported)
 	foreach ( $event_queries as $event_query ) {
-		$configs[] = array(
-			'type'    => 'total_events',
-			'filters' => array( 'event_query' => $event_query ),
-		);
-		
+		if ( in_array( 'total_events', $supported_types, true ) ) {
+			$configs[] = array(
+				'type'    => 'total_events',
+				'filters' => array( 'event_query' => $event_query ),
+			);
+		}
+	}
+	
+	// CRITICAL: Total attendees should only be pre-generated for PAST events
+	if ( in_array( 'total_attendees', $supported_types, true ) ) {
 		$configs[] = array(
 			'type'    => 'total_attendees',
-			'filters' => array( 'event_query' => $event_query ),
+			'filters' => array( 'event_query' => 'past' ),
 		);
 	}
 	
@@ -874,11 +1088,13 @@ function get_common_configs(): array {
 			continue;
 		}
 		
-		// Total terms count for this taxonomy (doesn't vary by event query)
-		$configs[] = array(
-			'type'    => 'total_taxonomy_terms',
-			'filters' => array( 'taxonomy' => $taxonomy->name ),
-		);
+		// Total terms count for this taxonomy (only if supported)
+		if ( in_array( 'total_taxonomy_terms', $supported_types, true ) ) {
+			$configs[] = array(
+				'type'    => 'total_taxonomy_terms',
+				'filters' => array( 'taxonomy' => $taxonomy->name ),
+			);
+		}
 		
 		// Get all terms in this taxonomy
 		$terms = \get_terms(
@@ -902,16 +1118,24 @@ function get_common_configs(): array {
 						'event_query' => $event_query,
 					);
 					
-					// Events in this term
-					$configs[] = array(
-						'type'    => 'events_per_taxonomy',
-						'filters' => $filters,
-					);
-					
-					// Attendees at events in this term
+					// Events in this term (only if supported)
+					if ( in_array( 'events_per_taxonomy', $supported_types, true ) ) {
+						$configs[] = array(
+							'type'    => 'events_per_taxonomy',
+							'filters' => $filters,
+						);
+					}
+				}
+				
+				// CRITICAL: Attendees at events in this term - ONLY for PAST events
+				if ( in_array( 'total_attendees', $supported_types, true ) ) {
 					$configs[] = array(
 						'type'    => 'total_attendees',
-						'filters' => $filters,
+						'filters' => array(
+							'taxonomy'    => $taxonomy->name,
+							'term_id'     => $term->term_id,
+							'event_query' => 'past',
+						),
 					);
 				}
 			}
@@ -919,7 +1143,10 @@ function get_common_configs(): array {
 	}
 	
 	// Generate cross-taxonomy configurations if we have multiple taxonomies
-	if ( is_array( $taxonomies ) && count( $taxonomies ) > 1 ) {
+	// and if taxonomy_terms_by_taxonomy is supported
+	if ( in_array( 'taxonomy_terms_by_taxonomy', $supported_types, true ) 
+		&& is_array( $taxonomies ) 
+		&& count( $taxonomies ) > 1 ) {
 		$taxonomy_array = array_values( $taxonomies );
 		
 		// Loop through each pair of taxonomies
@@ -976,8 +1203,10 @@ function get_common_configs(): array {
  * without delay when visitors load the site, while preventing resource-heavy
  * operations during bulk edits.
  *
- * Only generates statistics for non-excluded taxonomies by using the filtered
- * taxonomy list. Only generates for upcoming and past events, never for all events.
+ * Only generates statistics for:
+ * - non-excluded taxonomies by using the filtered taxonomy list
+ * - upcoming and past events, never for all events.
+ * - enabled statistic types.
  *
  * Process:
  * 1. Get list of common configurations
@@ -1001,13 +1230,16 @@ function pregenerate_cache(): void {
 		return;
 	}
 	
-	// Get array of common statistic configurations
+	// Get array of common statistic configurations (filtered by supported types)
 	$configs = get_common_configs();
 	
 	if ( ! is_array( $configs ) ) {
 		return;
 	}
-	
+
+	// Get configured cache expiration time
+	$expiration = get_cache_expiration();
+
 	// Loop through each configuration and pre-generate
 	foreach ( $configs as $config ) {
 		// Validate configuration has required keys
@@ -1030,8 +1262,8 @@ function pregenerate_cache(): void {
 		// Ensure value is a non-negative integer
 		$value = is_numeric( $value ) ? absint( $value ) : 0;
 		
-		// Store in cache for 12 hours
-		set_transient( $cache_key, $value, 12 * HOUR_IN_SECONDS );
+		// Store in cache with configured expiration time
+		\set_transient( $cache_key, $value, $expiration );
 	}
 }
 
@@ -1064,7 +1296,6 @@ function clear_cache(): void {
 	global $wpdb;
 	
 	// Delete all statistics transients from options table immediately
-	// This ensures fresh calculations when needed, but doesn't regenerate yet
 	$wpdb->query(
 		"DELETE FROM {$wpdb->options} 
 		WHERE option_name LIKE '_transient_gatherpress_stats_%' 
@@ -1143,8 +1374,8 @@ add_action( 'transition_post_status', __NAMESPACE__ . '\clear_cache_on_status_ch
  * Clear cache when attendee count post meta is updated.
  *
  * Hooked to post meta update actions. Clears all statistics caches when the
- * 'gatherpress_attendees_count' meta field is added, updated, or deleted
- * for posts from supported post types.
+ * 'gatherpress_attendees_count' meta field is added or updated for posts 
+ * from supported post types.
  * The actual regeneration happens 60 seconds later via cron.
  *
  * @since 0.1.0
@@ -1255,16 +1486,13 @@ function clear_cache_on_term_relationship( int $object_id, array $terms, array $
 add_action( 'set_object_terms', __NAMESPACE__ . '\clear_cache_on_term_relationship', 10, 3 );
 
 /**
- * Provide filtered taxonomies to the block editor via REST API.
- *
- * This endpoint returns only the taxonomies that are not excluded by the filter,
- * ensuring the block editor respects the developer's exclusion preferences.
+ * Provide filtered taxonomies and supported statistic types to the block editor via REST API.
  *
  * @since 0.1.0
  *
  * @return void
  */
-function register_rest_route(): void {
+function register_rest_routes(): void {
 	\register_rest_route(
 		'gatherpress-statistics/v1',
 		'/taxonomies',
@@ -1276,8 +1504,20 @@ function register_rest_route(): void {
 			},
 		)
 	);
+	
+	\register_rest_route(
+		'gatherpress-statistics/v1',
+		'/supported-types',
+		array(
+			'methods'             => 'GET',
+			'callback'            => __NAMESPACE__ . '\get_supported_types_endpoint',
+			'permission_callback' => function (): bool {
+				return current_user_can( 'edit_posts' );
+			},
+		)
+	);
 }
-add_action( 'rest_api_init', __NAMESPACE__ . '\register_rest_route' );
+add_action( 'rest_api_init', __NAMESPACE__ . '\register_rest_routes' );
 
 /**
  * REST API endpoint callback to get filtered taxonomies.
@@ -1309,6 +1549,19 @@ function get_taxonomies_endpoint(): \WP_REST_Response {
 	}
 	
 	return new \WP_REST_Response( $formatted_taxonomies, 200 );
+}
+
+/**
+ * REST API endpoint callback to get supported statistic types.
+ *
+ * @since 0.1.0
+ *
+ * @return \WP_REST_Response List of supported statistic types.
+ */
+function get_supported_types_endpoint(): \WP_REST_Response {
+	$supported_types = get_supported_statistic_types();
+	
+	return new \WP_REST_Response( $supported_types, 200 );
 }
 
 /**
