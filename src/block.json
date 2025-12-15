@@ -4,6 +4,12 @@
 	"name": "gatherpress/statistics",
 	"version": "0.1.0",
 	"title": "GatherPress Statistics",
+	"keywords": [
+		"statistics", 
+		"counters", 
+		"gatherpress", 
+		"events"
+	],
 	"category": "widgets",
 	"icon": "chart-bar",
 	"description": "Display dynamically calculated statistics about your GatherPress events with beautiful, cached counters.",

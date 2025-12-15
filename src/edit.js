@@ -18,7 +18,8 @@ import {
 	TextControl, 
 	ToggleControl,
 	FormTokenField,
-	__experimentalNumberControl as NumberControl
+	__experimentalNumberControl as NumberControl,
+	Notice
 } from '@wordpress/components';
 import { useSelect } from '@wordpress/data';
 import { useEffect, useState } from '@wordpress/element';
@@ -67,9 +68,11 @@ export default function Edit( { attributes, setAttributes, clientId } ) {
 	// Generate random preview count (between 1 and 100)
 	const [ previewCount ] = useState( () => Math.floor( Math.random() * 100 ) + 1 );
 
-	// State for filtered taxonomies from REST API
+	// State for filtered taxonomies and supported types from REST API
 	const [ filteredTaxonomies, setFilteredTaxonomies ] = useState( [] );
+	const [ supportedTypes, setSupportedTypes ] = useState( [] );
 	const [ isLoadingTaxonomies, setIsLoadingTaxonomies ] = useState( true );
+	const [ isLoadingTypes, setIsLoadingTypes ] = useState( true );
 
 	// Fetch filtered taxonomies from REST API
 	useEffect( () => {
@@ -85,12 +88,34 @@ export default function Edit( { attributes, setAttributes, clientId } ) {
 			} );
 	}, [] );
 
-	// Ensure eventQuery always has a value (default to 'past' if empty)
+	// Fetch supported statistic types from REST API
 	useEffect( () => {
-		if ( ! eventQuery || ! [ 'upcoming', 'past' ].includes( eventQuery ) ) {
-			setAttributes( { eventQuery: 'past' } );
+		setIsLoadingTypes( true );
+		apiFetch( { path: '/gatherpress-statistics/v1/supported-types' } )
+			.then( ( types ) => {
+				setSupportedTypes( types );
+				setIsLoadingTypes( false );
+			} )
+			.catch( () => {
+				setSupportedTypes( [] );
+				setIsLoadingTypes( false );
+			} );
+	}, [] );
+
+	// CRITICAL: For total_attendees, always set eventQuery to 'past' internally
+	useEffect( () => {
+		if ( statisticType === 'total_attendees' ) {
+			// Always ensure eventQuery is 'past' for total_attendees
+			if ( eventQuery !== 'past' ) {
+				setAttributes( { eventQuery: 'past' } );
+			}
+		} else {
+			// For other types, ensure eventQuery has a valid value
+			if ( ! eventQuery || ! [ 'upcoming', 'past' ].includes( eventQuery ) ) {
+				setAttributes( { eventQuery: 'past' } );
+			}
 		}
-	}, [ eventQuery, setAttributes ] );
+	}, [ statisticType, eventQuery, setAttributes ] );
 
 	// Fetch terms for all filtered taxonomies
 	const allTaxonomyTerms = useSelect( ( select ) => {
@@ -191,11 +216,16 @@ export default function Edit( { attributes, setAttributes, clientId } ) {
 				blockName = __( 'GatherPress Statistics', 'gatherpress-statistics' );
 		}
 
-		// Add event query type to name
-		if ( eventQuery === 'upcoming' ) {
-			blockName = __( 'Upcoming', 'gatherpress-statistics' ) + ': ' + blockName;
-		} else if ( eventQuery === 'past' ) {
+		// CRITICAL: For total_attendees, always add "Past:" prefix since it only shows past events
+		if ( statisticType === 'total_attendees' ) {
 			blockName = __( 'Past', 'gatherpress-statistics' ) + ': ' + blockName;
+		} else {
+			// For other types, add event query type to name
+			if ( eventQuery === 'upcoming' ) {
+				blockName = __( 'Upcoming', 'gatherpress-statistics' ) + ': ' + blockName;
+			} else if ( eventQuery === 'past' ) {
+				blockName = __( 'Past', 'gatherpress-statistics' ) + ': ' + blockName;
+			}
 		}
 
 		// Update the block's metadata name
@@ -220,7 +250,8 @@ export default function Edit( { attributes, setAttributes, clientId } ) {
 		updateBlockAttributes
 	] );
 
-	const statisticTypeOptions = [
+	// Build statistic type options - filter by what's supported
+	const allStatisticTypeOptions = [
 		{ label: __( 'Total Events', 'gatherpress-statistics' ), value: 'total_events' },
 		{ label: __( 'Total Attendees', 'gatherpress-statistics' ), value: 'total_attendees' },
 		{ label: __( 'Events per Taxonomy Term', 'gatherpress-statistics' ), value: 'events_per_taxonomy' },
@@ -229,11 +260,20 @@ export default function Edit( { attributes, setAttributes, clientId } ) {
 		{ label: __( 'Taxonomy Terms by Another Taxonomy', 'gatherpress-statistics' ), value: 'taxonomy_terms_by_taxonomy' },
 	];
 
+	// Filter options based on supported types
+	const statisticTypeOptions = isLoadingTypes 
+		? allStatisticTypeOptions
+		: allStatisticTypeOptions.filter( option => supportedTypes.includes( option.value ) );
+
+	// Check if current statistic type is supported
+	const isCurrentTypeSupported = supportedTypes.includes( statisticType );
+
 	const showSingleTaxonomyFilter = [ 'events_per_taxonomy', 'total_attendees' ].includes( statisticType );
 	const showMultiTaxonomy = [ 'events_multi_taxonomy' ].includes( statisticType );
 	const showTotalTaxonomyTerms = [ 'total_taxonomy_terms' ].includes( statisticType );
 	const showTaxonomyTermsByTaxonomy = [ 'taxonomy_terms_by_taxonomy' ].includes( statisticType );
-	const showEventQueryFilter = ! [ 'total_taxonomy_terms', 'taxonomy_terms_by_taxonomy' ].includes( statisticType );
+	// CRITICAL: Event query filter should NOT be shown for total_attendees (always past)
+	const showEventQueryFilter = ! [ 'total_taxonomy_terms', 'taxonomy_terms_by_taxonomy', 'total_attendees' ].includes( statisticType );
 
 	// Generate taxonomy options for dropdowns from filtered taxonomies
 	const taxonomyOptions = filteredTaxonomies
@@ -260,6 +300,12 @@ export default function Edit( { attributes, setAttributes, clientId } ) {
 	return (
 		<>
 			<InspectorControls>
+				{ ! isLoadingTypes && ! isCurrentTypeSupported && (
+					<Notice status="warning" isDismissible={ false }>
+						{ __( 'This statistic type is currently disabled. Enable it in your theme or plugin to use this block.', 'gatherpress-statistics' ) }
+					</Notice>
+				) }
+
 				<PanelBody title={ __( 'Statistic Settings', 'gatherpress-statistics' ) }>
 					<SelectControl
 						label={ __( 'Statistic Type', 'gatherpress-statistics' ) }
@@ -275,7 +321,12 @@ export default function Edit( { attributes, setAttributes, clientId } ) {
 								countTaxonomy: '',
 								filterTaxonomy: '',
 							} );
+							// CRITICAL: If switching to total_attendees, set eventQuery to 'past'
+							if ( value === 'total_attendees' ) {
+								setAttributes( { eventQuery: 'past' } );
+							}
 						} }
+						disabled={ isLoadingTypes }
 					/>
 
 					{ showEventQueryFilter && (
@@ -359,7 +410,7 @@ export default function Edit( { attributes, setAttributes, clientId } ) {
 					/>
 				</PanelBody>
 
-				{ showSingleTaxonomyFilter && (
+				{ showSingleTaxonomyFilter && isCurrentTypeSupported && (
 					<PanelBody 
 						title={ __( 'Taxonomy Filter', 'gatherpress-statistics' ) }
 						initialOpen={ false }
@@ -379,15 +430,23 @@ export default function Edit( { attributes, setAttributes, clientId } ) {
 										setAttributes( { selectedTaxonomy: value, selectedTerm: 0 } );
 									} }
 								/>
-								{ selectedTaxonomy && selectedTaxonomyTermOptions.length > 0 && (
-									<SelectControl
+								{ selectedTaxonomy && allTaxonomyTerms[ selectedTaxonomy ] && (
+									<FormTokenField
 										label={ __( 'Select Term', 'gatherpress-statistics' ) }
-										value={ selectedTerm }
-										options={ [
-											{ label: __( 'Select a term', 'gatherpress-statistics' ), value: 0 },
-											...selectedTaxonomyTermOptions,
-										] }
-										onChange={ ( value ) => setAttributes( { selectedTerm: parseInt( value, 10 ) } ) }
+										value={ selectedTerm ? [ allTaxonomyTerms[ selectedTaxonomy ].find( t => t.id === selectedTerm )?.name ].filter( Boolean ) : [] }
+										suggestions={ allTaxonomyTerms[ selectedTaxonomy ].map( term => term.name ) }
+										onChange={ ( tokens ) => {
+											if ( tokens.length > 0 ) {
+												const term = allTaxonomyTerms[ selectedTaxonomy ].find( t => t.name === tokens[0] );
+												if ( term ) {
+													setAttributes( { selectedTerm: term.id } );
+												}
+											} else {
+												setAttributes( { selectedTerm: 0 } );
+											}
+										} }
+										maxLength={ 1 }
+										help={ __( 'Select one term to filter by', 'gatherpress-statistics' ) }
 									/>
 								) }
 							</>
@@ -397,7 +456,7 @@ export default function Edit( { attributes, setAttributes, clientId } ) {
 					</PanelBody>
 				) }
 
-				{ showTotalTaxonomyTerms && (
+				{ showTotalTaxonomyTerms && isCurrentTypeSupported && (
 					<PanelBody 
 						title={ __( 'Taxonomy Selection', 'gatherpress-statistics' ) }
 						initialOpen={ false }
@@ -420,7 +479,7 @@ export default function Edit( { attributes, setAttributes, clientId } ) {
 					</PanelBody>
 				) }
 
-				{ showTaxonomyTermsByTaxonomy && (
+				{ showTaxonomyTermsByTaxonomy && isCurrentTypeSupported && (
 					<PanelBody 
 						title={ __( 'Taxonomy Configuration', 'gatherpress-statistics' ) }
 						initialOpen={ false }
@@ -472,7 +531,7 @@ export default function Edit( { attributes, setAttributes, clientId } ) {
 					</PanelBody>
 				) }
 
-				{ showMultiTaxonomy && filteredTaxonomies && filteredTaxonomies.length > 0 && (
+				{ showMultiTaxonomy && isCurrentTypeSupported && filteredTaxonomies && filteredTaxonomies.length > 0 && (
 					<>
 						{ filteredTaxonomies.map( ( taxonomy ) => {
 							const taxonomyTerms = allTaxonomyTerms[ taxonomy.slug ] || [];
@@ -519,16 +578,27 @@ export default function Edit( { attributes, setAttributes, clientId } ) {
 			</InspectorControls>
 
 			<div { ...useBlockProps() }>
-				<div className="gatherpress-stats-preview">
-					<div className="gatherpress-stats-number">
-						{ displayPrefix && displayPrefix + ' ' }
-						{ previewCount }
-						{ displaySuffix && ' ' + displaySuffix }
+				{ ! isLoadingTypes && ! isCurrentTypeSupported ? (
+					<div className="gatherpress-stats-preview" style={{ opacity: 0.5 }}>
+						<div className="gatherpress-stats-value">⚠️</div>
+						<div className="gatherpress-stats-label">
+							{ __( 'Statistic type disabled', 'gatherpress-statistics' ) }
+						</div>
 					</div>
-					{ showLabel && (
-						<div className="gatherpress-stats-label">{ displayLabel }</div>
-					) }
-				</div>
+				) : (
+					<div className="gatherpress-stats-preview">
+						<div className="gatherpress-stats-value">
+							{ displayPrefix && <span className="gatherpress-stats-prefix">{ displayPrefix }</span> }
+							{ displayPrefix && ' ' }
+							<span className="gatherpress-stats-number">{ previewCount }</span>
+							{ displaySuffix && ' ' }
+							{ displaySuffix && <span className="gatherpress-stats-suffix">{ displaySuffix }</span> }
+						</div>
+						{ showLabel && (
+							<div className="gatherpress-stats-label">{ displayLabel }</div>
+						) }
+					</div>
+				) }
 			</div>
 		</>
 	);

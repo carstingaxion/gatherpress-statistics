@@ -4,25 +4,25 @@ Stable tag: 0.1.0
 Tested up to: 6.8  
 License: GPL v2 or later  
 Tags: block, gatherpress, events, statistics  
-Contributors: carstenbach, WordPress Telex
+Contributors: carstenbach, WordPress Telex  
 
 Display dynamically calculated statistics about your GatherPress events with beautiful, cached counters.
 
 ## Description
 
-The GatherPress Statistics block is a powerful analytics tool designed for GatherPress event management. It provides statistics about your GatherPress events, venues, and topics with intelligent caching for optimal performance.
+The GatherPress Statistics block is a powerful tool  to provide statistics about your GatherPress events, venues, and topics with intelligent caching for optimal performance and a modular architecture that lets you control exactly which statistics are available.
 
-### Key Features
+### Key Features:
 
-* **Multiple Statistic Types:** Display total events, events per topic, events per venue, events by multiple taxonomy terms, total venues, or venues per topic
-* **Attendee Tracking:** Display total attendees across events or filtered by taxonomy
-* **Event Query Filtering:** Separate statistics for upcoming and past events
-* **Smart Caching System:** All statistics are calculated on data change using WordPress hooks and cached as transients for lightning-fast frontend performance
-* **Dynamic Taxonomy Support:** Automatically works with all taxonomies registered to GatherPress events
+* **Modular Statistics System:** Enable or disable individual statistic types via post type supports
+* **Multiple Statistic Types:** Total events, events per taxonomy, multi-taxonomy filtering, attendee counts, and more
+* **Smart Caching System:** All statistics are calculated on data change using WordPress hooks and cached as transients for lightning-fast performance
+* **Dynamic Taxonomy Support:** Automatically works with all taxonomies registered to supported post types
 * **Multiple Block Styles:** Choose from Counter, Card, Minimal, or Confetti display styles
 * **Theme.json Integration:** Fully compatible with theme.json spacing, typography, and color settings
-* **Performance Optimized:** No heavy queries during frontend rendering - all calculations happen in the background
 * **Conditional Formatting:** Show different prefix/suffix based on count thresholds
+* **Event Time Filtering:** Separate statistics for upcoming and past events
+* **Semantic HTML:** Uses proper HTML5 elements (`<figure>`, `<data>`, `<figcaption>`) for better accessibility
 
 ### Perfect For:
 
@@ -44,9 +44,9 @@ When you save an event, update attendee counts, or modify taxonomy terms, the pl
 4. Stores results as WordPress transients (default 12-hour expiration, customizable via filter)
 5. Frontend blocks retrieve cached values (0.001 seconds)
 
-## Installation
+== Installation ==
 
-1. Upload the plugin files to the `/wp-content/plugins/gatherpress-statistics` directory, ~~or install the plugin through the WordPress plugins screen directly.~~
+1. Upload the plugin files to the `/wp-content/plugins/gatherpress-statistics` directory
 2. Activate the plugin through the 'Plugins' screen in WordPress
 3. Ensure GatherPress plugin is installed and activated
 4. Add the "GatherPress Statistics" block to any post or page
@@ -86,6 +86,10 @@ The block automatically detects and works with any taxonomies registered to the 
 
 No. The plugin requires you to choose either upcoming or past events. This is by design to ensure accurate and meaningful statistics.
 
+### How do I style the number and label differently?
+
+See the "Styling with theme.json" section below for detailed examples of targeting specific elements.
+
 ## Screenshots
 
 1. ![Block editor interface showing statistic type selection and filtering options](assets/screenshot-1.png)
@@ -97,32 +101,296 @@ No. The plugin requires you to choose either upcoming or past events. This is by
 7. Multiple taxonomy filter panel for complex queries
 8. ![Conditional prefix/suffix settings for dynamic formatting](assets/screenshot-8.png)
 
-## Changelog
+## Block Usage
 
-###  0.1.0
-* Initial release
-* Support GatherPress post types & with any taxonomies
-* Filtering for upcoming or past events
-* Smart caching system with automatic invalidation
-* Scheduled cache regeneration system
-* Four display style variations including animated Confetti style
-* Full theme.json integration
-* Comprehensive taxonomy filtering
-* Attendee count statistics
-* Conditional prefix/suffix formatting
-* Comprehensive documentation and developer hooks
+### Basic Usage
 
-## Developer Documentation
+1. Add the "GatherPress Statistics" block to your post or page
+2. Select a statistic type from the sidebar
+3. Choose between upcoming or past events (where applicable)
+4. Configure labels and formatting options
+5. Apply filters if needed (taxonomy, terms, etc.)
+
+### Event Time Filtering
+
+Most statistics support filtering by event time:
+
+- **Upcoming Events**: Events scheduled in the future
+- **Past Events**: Events that have already occurred
+
+Note: This filter is not available for taxonomy term counts.
+
+### Single Taxonomy Filtering
+
+For "Events per Taxonomy Term" and "Total Attendees" statistics:
+
+1. Select a taxonomy (e.g., "Topics")
+2. Choose a specific term (e.g., "WordPress")
+3. Statistics will show only events with that term
+
+### Multiple Taxonomy Filtering
+
+For "Events (Multiple Taxonomies)" statistics:
+
+1. Expand each taxonomy panel in the sidebar
+2. Select multiple terms from each taxonomy
+3. Events must match ALL selected terms (AND relationship)
+
+Example: Select "WordPress" from Topics AND "Beginner" from Skill Level
+
+### Conditional Formatting
+
+Customize the display based on count thresholds:
+
+1. Set a threshold number (e.g., 10)
+2. Define default prefix/suffix (e.g., "Total" / "events")
+3. Define conditional prefix/suffix (e.g., "Over" / "and counting!")
+4. When count exceeds threshold, conditional values are used
+
+### Block Styles
+
+- **Counter** (default): Large number with label below
+- **Card**: Elevated card design with shadow
+- **Minimal**: Compact display with smaller text
+- **Confetti**: Gradient background with hover animation
+
+== Styling with theme.json ==
+
+### HTML Structure
+
+The block uses semantic HTML for better accessibility and styling:
+
+```html
+<figure class="wp-block-gatherpress-statistics">
+  <data class="gatherpress-stats-value" value="42">
+    <span class="gatherpress-stats-prefix">Over</span>
+    <span class="gatherpress-stats-number">42</span>
+    <span class="gatherpress-stats-suffix">and counting</span>
+  </data>
+  <figcaption class="gatherpress-stats-label">Events</figcaption>
+</figure>
+```
+
+### Key Elements:
+
+- **`<figure>`**: Container with block classes and styles
+- **`<data>`**: Holds the numeric value with machine-readable `value` attribute
+- **`<span class="gatherpress-stats-number">`**: The actual statistic number
+- **`<span class="gatherpress-stats-prefix">`**: Optional prefix text (e.g., "Over", "+")
+- **`<span class="gatherpress-stats-suffix">`**: Optional suffix text (e.g., "total", "and counting")
+- **`<figcaption>`**: The descriptive label
+
+### Styling the Number Separately
+
+Target the `.gatherpress-stats-number` class to style just the number:
+
+```json
+{
+  "version": 2,
+  "styles": {
+    "blocks": {
+      "gatherpress/statistics": {
+        "elements": {
+          ".gatherpress-stats-number": {
+            "typography": {
+              "fontSize": "4rem",
+              "fontWeight": "900",
+              "lineHeight": "1"
+            },
+            "color": {
+              "text": "var(--wp--preset--color--primary)"
+            }
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+### Styling the Label Separately
+
+Target the `.gatherpress-stats-label` class:
+
+```json
+{
+  "version": 2,
+  "styles": {
+    "blocks": {
+      "gatherpress/statistics": {
+        "elements": {
+          ".gatherpress-stats-label": {
+            "typography": {
+              "fontSize": "0.875rem",
+              "fontWeight": "600",
+              "textTransform": "uppercase",
+              "letterSpacing": "0.05em"
+            },
+            "color": {
+              "text": "var(--wp--preset--color--contrast)"
+            },
+            "spacing": {
+              "margin": {
+                "top": "0.5rem"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+### Styling Prefix and Suffix
+
+```json
+{
+  "version": 2,
+  "styles": {
+    "blocks": {
+      "gatherpress/statistics": {
+        "elements": {
+          ".gatherpress-stats-prefix, .gatherpress-stats-suffix": {
+            "typography": {
+              "fontSize": "0.75em",
+              "fontWeight": "600"
+            },
+            "color": {
+              "text": "var(--wp--preset--color--secondary)"
+            }
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+### Complete Styling Example
+
+```json
+{
+  "version": 2,
+  "styles": {
+    "blocks": {
+      "gatherpress/statistics": {
+        "spacing": {
+          "padding": "2rem"
+        },
+        "border": {
+          "radius": "8px"
+        },
+        "color": {
+          "background": "var(--wp--preset--color--base)",
+          "text": "var(--wp--preset--color--contrast)"
+        },
+        "elements": {
+          ".gatherpress-stats-value": {
+            "spacing": {
+              "margin": {
+                "bottom": "1rem"
+              }
+            }
+          },
+          ".gatherpress-stats-number": {
+            "typography": {
+              "fontSize": "clamp(3rem, 8vw, 5rem)",
+              "fontWeight": "900",
+              "lineHeight": "1"
+            },
+            "color": {
+              "text": "var(--wp--preset--color--primary)"
+            }
+          },
+          ".gatherpress-stats-prefix, .gatherpress-stats-suffix": {
+            "typography": {
+              "fontSize": "1rem",
+              "fontWeight": "600"
+            },
+            "color": {
+              "text": "var(--wp--preset--color--secondary)"
+            }
+          },
+          ".gatherpress-stats-label": {
+            "typography": {
+              "fontSize": "1.25rem",
+              "fontWeight": "500",
+              "textTransform": "uppercase",
+              "letterSpacing": "0.1em"
+            },
+            "color": {
+              "text": "var(--wp--preset--color--contrast)"
+            }
+          }
+        },
+        "variations": {
+          "card": {
+            "shadow": "0 4px 6px -1px rgb(0 0 0 / 0.1)",
+            "elements": {
+              ".gatherpress-stats-number": {
+                "typography": {
+                  "fontSize": "4.5rem"
+                }
+              }
+            }
+          },
+          "minimal": {
+            "spacing": {
+              "padding": "1rem"
+            },
+            "elements": {
+              ".gatherpress-stats-number": {
+                "typography": {
+                  "fontSize": "2rem"
+                }
+              },
+              ".gatherpress-stats-label": {
+                "typography": {
+                  "fontSize": "0.875rem"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+### Responsive Typography
+
+Use `clamp()` for fluid typography:
+
+```json
+{
+  "elements": {
+    ".gatherpress-stats-number": {
+      "typography": {
+        "fontSize": "clamp(2.5rem, 6vw + 1rem, 5rem)"
+      }
+    },
+    ".gatherpress-stats-label": {
+      "typography": {
+        "fontSize": "clamp(0.875rem, 2vw + 0.5rem, 1.25rem)"
+      }
+    }
+  }
+}
+```
+
+== Developer Documentation ==
 
 ### Architecture Overview:
 
 The plugin uses a layered architecture for optimal performance:
-
-1. **Data Layer:** WordPress hooks monitor all relevant data changes
-2. **Scheduling Layer:** Changes trigger scheduled cache regeneration (60s delay)
-3. **Calculation Layer:** Efficient WP_Query-based calculations
-4. **Cache Layer:** WordPress transients store results
-5. **Presentation Layer:** Block renders cached data
+1. **Post Type Support Layer:** Controls which statistics are available
+2. **Data Layer:** WordPress hooks monitor all relevant data changes
+3. **Scheduling Layer:** Changes trigger scheduled cache regeneration (60s delay)
+4. **Calculation Layer:** Efficient WP_Query-based calculations
+5. **Cache Layer:** WordPress transients store results
+6. **Presentation Layer:** Block renders cached data
 
 ### Example Data Structure (15 events, 3 topics, 3 venues):
 
@@ -147,8 +415,7 @@ Cached Statistics Examples:
 // Total counts by event query
 get_transient( 'gatherpress_stats_total_events_upcoming_abc123' ); // Returns: 8
 get_transient( 'gatherpress_stats_total_events_past_def456' );     // Returns: 7
-get_transient( 'gatherpress_stats_total_attendees_upcoming_ghi789' ); // Returns: 185
-get_transient( 'gatherpress_stats_total_attendees_past_jkl012' );     // Returns: 195
+get_transient( 'gatherpress_stats_total_attendees_past_jkl012' );  // Returns: 195
 
 // Per taxonomy
 get_transient( 'gatherpress_stats_total_taxonomy_terms_mno345' ); // 3 topics
@@ -157,14 +424,71 @@ get_transient( 'gatherpress_stats_total_taxonomy_terms_pqr678' ); // 3 venues
 // Per term with event query
 get_transient( 'gatherpress_stats_events_per_taxonomy_upcoming_stu901' ); // 4 (upcoming Technology events)
 get_transient( 'gatherpress_stats_events_per_taxonomy_past_vwx234' );    // 3 (past Technology events)
-get_transient( 'gatherpress_stats_total_attendees_upcoming_yza567' );    // 100 (upcoming Technology attendees)
 get_transient( 'gatherpress_stats_total_attendees_past_bcd890' );        // 100 (past Technology attendees)
 
 // Cross-taxonomy
 get_transient( 'gatherpress_stats_taxonomy_terms_by_taxonomy_efg123' ); // 2 (venues with Tech events)
 ```
 
-### Hook Reference:
+### Configuration Guide
+
+**Post Type Support System**
+
+The plugin uses WordPress post type supports to provide granular control over functionality. By default, it registers support for `gatherpress_event` with all statistic types enabled:
+
+```php
+add_post_type_support( 'gatherpress_event', 'gatherpress_statistics', array(
+    'total_events' => true,                // Total event counts
+    'events_per_taxonomy' => true,         // Events filtered by single taxonomy
+    'events_multi_taxonomy' => false,      // Events filtered by multiple taxonomies
+    'total_taxonomy_terms' => false,       // Count of taxonomy terms
+    'taxonomy_terms_by_taxonomy' => false, // Cross-taxonomy term counts
+    'total_attendees' => true,             // Attendee counts
+) );
+```
+
+**Available Statistic Types**
+
+1. **total_events** - Count all events (with optional filters)
+2. **events_per_taxonomy** - Count events in a specific taxonomy term
+3. **events_multi_taxonomy** - Count events matching multiple taxonomy terms (AND relationship)
+4. **total_taxonomy_terms** - Count total terms in a taxonomy
+5. **taxonomy_terms_by_taxonomy** - Count terms from one taxonomy that have events in another
+6. **total_attendees** - Sum of attendees across events (with optional filters)
+
+**Modifying Default Configuration**
+
+Use the `gatherpress_statistics_support_config` filter to customize which statistic types are enabled:
+
+```php
+add_filter( 'gatherpress_statistics_support_config', function( $config ) {
+    // Disable complex statistics for better performance
+    $config['events_multi_taxonomy'] = false;
+    $config['taxonomy_terms_by_taxonomy'] = false;
+    
+    // Enable all basic statistics
+    $config['total_events'] = true;
+    $config['total_attendees'] = true;
+    $config['events_per_taxonomy'] = true;
+    
+    return $config;
+} );
+```
+
+**Adding Support to Custom Post Types**
+
+Extend the plugin to work with your custom event post types:
+
+```php
+add_action( 'init', function() {
+    add_post_type_support( 'my_event_cpt', 'gatherpress_statistics', array(
+        'total_events' => true,
+        'events_per_taxonomy' => true,
+        'total_attendees' => false,  // Don't track attendees for this type
+    ) );
+}, 20 );
+```
+
 
 ```php
 /**
@@ -172,6 +496,8 @@ get_transient( 'gatherpress_stats_taxonomy_terms_by_taxonomy_efg123' ); // 2 (ve
  *
  * This filter allows developers to exclude taxonomies from both
  * statistics generation and block editor selection.
+ *
+ * Note: `_gatherpress_venue` is excluded by default.
  *
  * @since 0.1.0
  *
@@ -185,7 +511,10 @@ add_filter( 'gatherpress_statistics_excluded_taxonomies', function( $excluded, $
     $excluded[] = 'custom_event_type';
     return $excluded;
 }, 10, 2 );
+```
 
+
+```php
 /**
  * Modify cache expiration time.
  *
@@ -211,7 +540,10 @@ add_filter( 'gatherpress_statistics_cache_expiration', function( $expiration ) {
 add_filter( 'gatherpress_statistics_cache_expiration', function( $expiration ) {
     return DAY_IN_SECONDS;
 } );
+```
 
+
+```php
 /**
  * Filter calculated statistics before caching.
  *
@@ -273,13 +605,15 @@ add_filter( 'gatherpress_stats_calculate_total_events', function( $count, $filte
 
 The plugin uses a smart cache invalidation system that balances freshness with performance:
 
-**Trigger Events:**
+#### Trigger Events:
+
 1. Event post status changes to/from 'publish' (`transition_post_status`)
 2. Attendee count meta field updated (`updated_post_meta`, `added_post_meta`, `deleted_post_meta`)
 3. GatherPress taxonomy terms created, edited, or deleted (`create_term`, `edit_term`, `delete_term`)
 4. Taxonomy term relationships change (`set_object_terms`)
 
-**Cache Clearing Process:**
+#### Cache Clearing Process:
+
 1. Trigger event occurs (e.g., event published)
 2. All statistics transients deleted immediately from database
 3. Single cron job scheduled to run in 60 seconds
@@ -287,13 +621,15 @@ The plugin uses a smart cache invalidation system that balances freshness with p
 5. After 60s, background regeneration creates ~50-60 common statistics
 6. Each statistic cached with configured expiration (default 12 hours)
 
-**Why 60-second delay?**
+#### Why 60-second delay?
+
 - Prevents multiple regenerations during bulk operations
 - Avoids resource exhaustion during large imports
 - Allows all related changes to complete first
 - Doesn't block or slow down admin operations
 
-**Manual Cache Clearing:**
+#### Manual Cache Clearing:
+
 ```php
 // Clear cache programmatically
 \GatherPressStatistics\clear_cache();
@@ -303,6 +639,24 @@ The plugin uses a smart cache invalidation system that balances freshness with p
 \GatherPressStatistics\pregenerate_cache();
 ```
 
+
+## Changelog
+
+###  0.1.0
+* Initial release
+* Support GatherPress post types & with any taxonomies
+* Filtering for upcoming or past events
+* Smart caching system with automatic invalidation
+* Scheduled cache regeneration system
+* Four display style variations including animated Confetti style
+* Full theme.json integration
+* Comprehensive taxonomy filtering
+* Attendee count statistics
+* Conditional prefix/suffix formatting
+* Comprehensive documentation and developer hooks
+* Semantic HTML structure with `<figure>`, `<data>`, and `<figcaption>` elements
+
+
 ## Privacy & Data
 
-This plugin does not collect, store, or transmit any personal data. It only queries and caches statistics about your GatherPress events and taxonomies.
+This plugin does not collect, store, or transmit any personal data. It only queries and caches statistics about your events and taxonomies. All data is stored locally in your WordPress database using the transients API.

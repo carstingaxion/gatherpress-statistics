@@ -17,10 +17,15 @@ $prefix_conditional  = isset( $attributes['prefixConditional'] ) ? $attributes['
 $suffix_conditional  = isset( $attributes['suffixConditional'] ) ? $attributes['suffixConditional'] : '';
 $conditional_threshold = isset( $attributes['conditionalThreshold'] ) ? intval( $attributes['conditionalThreshold'] ) : 10;
 
-// CRITICAL: Validate event_query - only 'upcoming' or 'past' allowed
-if ( empty( $event_query ) || ! in_array( $event_query, array( 'upcoming', 'past' ), true ) ) {
-	// Default to 'past' if invalid or empty
+// CRITICAL: For total_attendees, always force eventQuery to 'past'
+if ( 'total_attendees' === $statistic_type ) {
 	$event_query = 'past';
+} else {
+	// For other types, validate event_query - only 'upcoming' or 'past' allowed
+	if ( empty( $event_query ) || ! in_array( $event_query, array( 'upcoming', 'past' ), true ) ) {
+		// Default to 'past' if invalid or empty
+		$event_query = 'past';
+	}
 }
 
 // Build filters array
@@ -65,15 +70,8 @@ if ( 'events_multi_taxonomy' === $statistic_type ) {
 	}
 }
 
-// DEBUG: Log the filters being used
-error_log( 'GatherPress Stats Debug - Statistic Type: ' . $statistic_type );
-error_log( 'GatherPress Stats Debug - Filters: ' . print_r( $filters, true ) );
-
 // Get cached statistic
 $count = \GatherPressStatistics\get_cached( $statistic_type, $filters );
-
-// DEBUG: Log the result
-error_log( 'GatherPress Stats Debug - Count Result: ' . $count );
 
 // Don't display if count is 0
 if ( $count === 0 ) {
@@ -89,21 +87,21 @@ $display_suffix  = ( $use_conditional && ! empty( $suffix_conditional ) ) ? $suf
 $display_label = ( 1 === $count ) ? $label_singular : $label_plural;
 
 ?>
-<div <?php echo get_block_wrapper_attributes(); ?>>
-	<div class="gatherpress-stats-number">
+<figure <?php echo get_block_wrapper_attributes(); ?>>
+	<data class="gatherpress-stats-value" value="<?php echo esc_attr( $count ); ?>">
 		<?php 
 		if ( ! empty( $display_prefix ) ) {
-			echo esc_html( $display_prefix ) . ' ';
+			?><span class="gatherpress-stats-prefix"><?php echo esc_html( $display_prefix ); ?></span> <?php
 		}
-		echo esc_html( number_format_i18n( $count ) );
+		?><span class="gatherpress-stats-number"><?php echo esc_html( number_format_i18n( $count ) ); ?></span><?php
 		if ( ! empty( $display_suffix ) ) {
-			echo ' ' . esc_html( $display_suffix );
+			?> <span class="gatherpress-stats-suffix"><?php echo esc_html( $display_suffix ); ?></span><?php
 		}
 		?>
-	</div>
+	</data>
 	<?php if ( $show_label && ! empty( $display_label ) ) : ?>
-		<div class="gatherpress-stats-label">
+		<figcaption class="gatherpress-stats-label">
 			<?php echo esc_html( $display_label ); ?>
-		</div>
+		</figcaption>
 	<?php endif; ?>
-</div>
+</figure>

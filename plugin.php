@@ -19,46 +19,208 @@ namespace GatherPressStatistics;
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
-
 /**
- * Check if GatherPress is active and post type exists.
+ * Register post type support for gatherpress_statistics with granular control.
  *
- * This function verifies that the GatherPress plugin is installed and active
- * by checking if the 'gatherpress_event' custom post type is registered.
+ * This function adds the 'gatherpress_statistics' support to the 'gatherpress_event'
+ * post type by default with all statistic types enabled. Developers can modify
+ * this configuration to enable/disable specific statistic types.
+ *
+ * Example to disable specific statistic types:
+ *
+ * ```php
+ * add_filter( 'gatherpress_statistics_support_config', function( $config ) {
+ *     $config['events_multi_taxonomy'] = false;
+ *     $config['total_taxonomy_terms'] = false;
+ *     return $config;
+ * } );
+ * ```
  *
  * @since 0.1.0
  *
- * @return bool True if GatherPress is available, false otherwise.
+ * @return void
  */
-function is_gatherpress_active(): bool {
-	return \post_type_exists( 'gatherpress_event' );
+function register_post_type_support(): void {
+	// Default configuration with all statistic types enabled
+	$default_config = array(
+		'total_events'                => true,
+		'events_per_taxonomy'         => true,
+		'events_multi_taxonomy'       => false,
+		'total_taxonomy_terms'        => false,
+		'taxonomy_terms_by_taxonomy'  => false,
+		'total_attendees'             => true,
+	);
+	
+	/**
+	 * Filter the statistics support configuration.
+	 *
+	 * Allows developers to enable or disable specific statistic types.
+	 *
+	 * @since 0.1.0
+	 *
+	 * @param array<string, bool> $config Configuration array with statistic type keys and boolean values.
+	 */
+	$config = apply_filters( 'gatherpress_statistics_support_config', $default_config );
+	
+	add_post_type_support( 'gatherpress_event', 'gatherpress_statistics', $config );
+}
+add_action( 'registered_post_type_gatherpress_event', __NAMESPACE__ . '\register_post_type_support' );
+
+/**
+ * Get the statistics support configuration for a post type.
+ *
+ * Retrieves the configuration array that specifies which statistic types
+ * are enabled for a given post type.
+ *
+ * @since 0.1.0
+ *
+ * @param string $post_type Post type slug.
+ * @return array<string, bool> Configuration array, or empty array if not supported.
+ */
+function get_support_config( string $post_type = 'gatherpress_event' ): array {
+	if ( ! post_type_supports( $post_type, 'gatherpress_statistics' ) ) {
+		return array();
+	}
+	
+	// Get the support args (third parameter from add_post_type_support)
+	$supports = get_all_post_type_supports( $post_type );
+	
+	if ( isset( $supports['gatherpress_statistics'] ) && is_array( $supports['gatherpress_statistics'] ) ) {
+		// Return the first element which contains our configuration
+		return reset( $supports['gatherpress_statistics'] );
+	}
+	
+	// Default configuration if none found
+	return array(
+		'total_events'                => true,
+		'events_per_taxonomy'         => true,
+		'events_multi_taxonomy'       => true,
+		'total_taxonomy_terms'        => true,
+		'taxonomy_terms_by_taxonomy'  => true,
+		'total_attendees'             => true,
+	);
 }
 
 /**
- * Get all taxonomies registered for gatherpress_event post type.
+ * Check if a specific statistic type is supported.
  *
- * Retrieves all taxonomy objects that are registered to the GatherPress
- * event custom post type. This allows the block to dynamically work with
- * any taxonomies associated with events, not just hardcoded ones.
+ * @since 0.1.0
+ *
+ * @param string $statistic_type The statistic type to check.
+ * @param string $post_type      Optional. Post type to check. Default 'gatherpress_event'.
+ * @return bool True if the statistic type is supported, false otherwise.
+ */
+function is_statistic_type_supported( string $statistic_type, string $post_type = 'gatherpress_event' ): bool {
+	$config = get_support_config( $post_type );
+	
+	if ( empty( $config ) ) {
+		return false;
+	}
+	
+	return ! empty( $config[ $statistic_type ] );
+}
+
+/**
+ * Get all supported statistic types for a post type.
+ *
+ * @since 0.1.0
+ *
+ * @param string $post_type Optional. Post type to check. Default 'gatherpress_event'.
+ * @return array<int, string> Array of supported statistic type slugs.
+ */
+function get_supported_statistic_types( string $post_type = 'gatherpress_event' ): array {
+	$config = get_support_config( $post_type );
+	
+	if ( empty( $config ) ) {
+		return array();
+	}
+	
+	// Filter to only enabled types
+	$enabled_types = array();
+	foreach ( $config as $type => $enabled ) {
+		if ( $enabled ) {
+			$enabled_types[] = $type;
+		}
+	}
+	
+	return $enabled_types;
+}
+
+/**
+ * Get all post types that support gatherpress_statistics.
+ *
+ * This function retrieves all post types that have registered support for
+ * the 'gatherpress_statistics' feature. This allows the plugin to work with
+ * any post type that opts in, not just gatherpress_event.
+ *
+ * @since 0.1.0
+ *
+ * @return array<int, string> Array of post type slugs that support statistics.
+ */
+function get_supported_post_types(): array {
+	$post_types = get_post_types_by_support( 'gatherpress_statistics' );
+	
+	if ( empty( $post_types ) || ! is_array( $post_types ) ) {
+		return array();
+	}
+	
+	return $post_types;
+}
+
+/**
+ * Check if any post types support gatherpress_statistics.
+ *
+ * This function verifies that at least one post type has registered support
+ * for the 'gatherpress_statistics' feature.
+ *
+ * @since 0.1.0
+ *
+ * @return bool True if at least one post type supports statistics, false otherwise.
+ */
+function has_supported_post_types(): bool {
+	$post_types = get_supported_post_types();
+	return ! empty( $post_types );
+}
+
+/**
+ * Get all taxonomies registered for supported post types.
+ *
+ * Retrieves all taxonomy objects that are registered to post types supporting
+ * the 'gatherpress_statistics' feature. This allows the block to dynamically work with
+ * any taxonomies associated with supported post types.
  *
  * @since 0.1.0
  *
  * @return array<int, \WP_Taxonomy> Array of taxonomy objects, or empty array if none found.
  */
 function get_taxonomies(): array {
-	// Check if the post type exists before querying taxonomies
-	if ( ! is_gatherpress_active() ) {
+	$post_types = get_supported_post_types();
+	
+	if ( empty( $post_types ) ) {
 		return array();
 	}
 	
-	// Get all taxonomy objects registered to this post type
-	$taxonomies = \get_object_taxonomies( 'gatherpress_event', 'objects' );
+	$all_taxonomies = array();
 	
-	if ( empty( $taxonomies ) ) {
-		return array();
+	// Get taxonomies for each supported post type
+	foreach ( $post_types as $post_type ) {
+		if ( ! post_type_exists( $post_type ) ) {
+			continue;
+		}
+		
+		$taxonomies = \get_object_taxonomies( $post_type, 'objects' );
+		
+		if ( ! empty( $taxonomies ) && is_array( $taxonomies ) ) {
+			// Merge taxonomies, avoiding duplicates by slug
+			foreach ( $taxonomies as $taxonomy ) {
+				if ( isset( $taxonomy->name ) ) {
+					$all_taxonomies[ $taxonomy->name ] = $taxonomy;
+				}
+			}
+		}
 	}
 	
-	return $taxonomies;
+	return array_values( $all_taxonomies );
 }
 
 /**
@@ -68,28 +230,14 @@ function get_taxonomies(): array {
  * to allow developers to exclude specific taxonomies from statistics generation
  * and block selection.
  *
- * Example usage to exclude post_tag and a custom taxonomy:
+ * By default, the '_gatherpress_venue' taxonomy is excluded.
+ *
+ * Example usage to exclude additional taxonomies:
  *
  * ```php
  * add_filter( 'gatherpress_statistics_excluded_taxonomies', function( $excluded ) {
  *     $excluded[] = 'post_tag';           // Exclude WordPress tags
  *     $excluded[] = 'custom_event_type';  // Exclude custom taxonomy
- *     return $excluded;
- * } );
- * ```
- *
- * Example usage to exclude venue taxonomy from statistics:
- *
- * ```php
- * // Only exclude venues from calculations, but keep in editor
- * add_filter( 'gatherpress_statistics_excluded_taxonomies', function( $excluded ) {
- *     // Don't exclude from editor, handle separately in block registration
- *     return $excluded;
- * } );
- *
- * // Or exclude venues completely from both calculations and editor
- * add_filter( 'gatherpress_statistics_excluded_taxonomies', function( $excluded ) {
- *     $excluded[] = '_gatherpress_venue';
  *     return $excluded;
  * } );
  * ```
@@ -118,9 +266,9 @@ function get_filtered_taxonomies( bool $for_editor = false ): array {
 	 * @param array<int, string> $excluded_taxonomies Array of taxonomy slugs to exclude.
 	 * @param bool               $for_editor          Whether this is for editor selection.
 	 */
-	$excluded_taxonomies = \apply_filters(
+	$excluded_taxonomies = apply_filters(
 		'gatherpress_statistics_excluded_taxonomies',
-		array(),
+		array( '_gatherpress_venue' ),
 		$for_editor
 	);
 	
@@ -159,9 +307,9 @@ function get_filtered_taxonomies( bool $for_editor = false ): array {
  * @return void
  */
 function block_init(): void {
-	\register_block_type( __DIR__ . '/build/' );
+	register_block_type( __DIR__ . '/build/' );
 }
-\add_action( 'init', __NAMESPACE__ . '\block_init' );
+add_action( 'init', __NAMESPACE__ . '\block_init' );
 
 /**
  * Get cache key for a specific statistic configuration.
@@ -199,12 +347,13 @@ function get_cache_key( string $statistic_type, array $filters = array() ): stri
 	
 	// Add a hash of ALL filters (including event_query) to ensure uniqueness
 	if ( ! empty( $filters ) ) {
-		$key_parts[] = md5( \wp_json_encode( $filters ) );
+		$key_parts[] = md5( wp_json_encode( $filters ) );
 	}
 	
 	// Join parts with underscores to create the final cache key
 	return implode( '_', $key_parts );
 }
+
 
 /**
  * Get cache expiration time in seconds.
@@ -264,6 +413,7 @@ function get_cache_expiration(): int {
 	return absint( $expiration );
 }
 
+
 /**
  * Calculate statistics based on type and filters.
  *
@@ -271,18 +421,8 @@ function get_cache_expiration(): int {
  * functions based on the statistic type requested. All heavy lifting happens
  * here and the results are cached for performance.
  *
- * Supported statistic types:
- * - 'total_events': Count all published events
- * - 'events_per_taxonomy': Count events in a specific taxonomy term
- * - 'events_multi_taxonomy': Count events matching multiple taxonomy filters
- * - 'total_taxonomy_terms': Count total terms in a taxonomy
- * - 'taxonomy_terms_by_taxonomy': Count terms of one taxonomy filtered by another
- * - 'total_attendees': Sum all attendees from event post meta
- *
- * All statistics MUST be filtered by event query type (upcoming/past) using the
- * 'event_query' filter parameter:
- * - 'upcoming': Only count future events
- * - 'past': Only count past events
+ * IMPORTANT: This function checks if the requested statistic type is supported
+ * before performing any calculations.
  *
  * @since 0.1.0
  *
@@ -291,8 +431,13 @@ function get_cache_expiration(): int {
  * @return int Calculated statistic value, always non-negative.
  */
 function calculate( string $statistic_type, array $filters = array() ): int {
-	// Verify GatherPress is active before attempting calculations
-	if ( ! is_gatherpress_active() ) {
+	// Verify at least one post type supports statistics
+	if ( ! has_supported_post_types() ) {
+		return 0;
+	}
+	
+	// CRITICAL: Check if this statistic type is supported
+	if ( ! is_statistic_type_supported( $statistic_type ) ) {
 		return 0;
 	}
 	
@@ -339,6 +484,7 @@ function calculate( string $statistic_type, array $filters = array() ): int {
 	// Ensure result is always a non-negative integer
 	$result = is_numeric( $result ) ? absint( $result ) : 0;
 	
+
 	/**
 	 * Filter calculated statistics before caching.
 	 *
@@ -404,9 +550,10 @@ function calculate( string $statistic_type, array $filters = array() ): int {
 /**
  * Count events with optional taxonomy filters and event query type.
  *
- * Performs a WP_Query to count published GatherPress events. Supports filtering
- * by multiple taxonomy terms across different taxonomies using an AND relationship,
- * as well as filtering by event query type (upcoming or past).
+ * Performs a WP_Query to count published events from supported post types.
+ * Supports filtering by multiple taxonomy terms across different taxonomies
+ * using an AND relationship, as well as filtering by event query type
+ * (upcoming or past).
  *
  * Filter structure example:
  * array(
@@ -436,8 +583,9 @@ function calculate( string $statistic_type, array $filters = array() ): int {
  * @return int Number of events matching the filters.
  */
 function count_events( array $filters = array() ): int {
-	// Ensure the post type exists
-	if ( ! is_gatherpress_active() ) {
+	$post_types = get_supported_post_types();
+	
+	if ( empty( $post_types ) ) {
 		return 0;
 	}
 	
@@ -446,10 +594,11 @@ function count_events( array $filters = array() ): int {
 	
 	// Build the base query arguments
 	$args = array(
-		'post_type'      => 'gatherpress_event',
+		#'post_type'      => 'gatherpress_event',
+		'post_type'      => $post_types,
 		'post_status'    => 'publish',
-		'posts_per_page' => -1,        // Get all posts
-		'fields'         => 'ids',     // Only return IDs for performance
+		'posts_per_page' => -1,
+		'fields'         => 'ids',
 	);
 	
 	// CRITICAL: Add GatherPress event query parameter with proper validation
@@ -462,7 +611,7 @@ function count_events( array $filters = array() ): int {
 	
 	// Handle single taxonomy filter (taxonomy + term_id)
 	if ( ! empty( $filters['taxonomy'] ) && ! empty( $filters['term_id'] ) ) {
-		if ( \taxonomy_exists( $filters['taxonomy'] ) ) {
+		if ( taxonomy_exists( $filters['taxonomy'] ) ) {
 			$args['tax_query'] = array(
 				array(
 					'taxonomy' => sanitize_key( $filters['taxonomy'] ),
@@ -480,7 +629,7 @@ function count_events( array $filters = array() ): int {
 		// Loop through each taxonomy and its terms
 		foreach ( $filters['taxonomy_terms'] as $taxonomy => $term_ids ) {
 			// Validate that we have term IDs and the taxonomy exists
-			if ( ! empty( $term_ids ) && is_array( $term_ids ) && \taxonomy_exists( $taxonomy ) ) {
+			if ( ! empty( $term_ids ) && is_array( $term_ids ) && taxonomy_exists( $taxonomy ) ) {
 				$tax_query[] = array(
 					'taxonomy' => sanitize_key( $taxonomy ),
 					'field'    => 'term_id',
@@ -505,7 +654,8 @@ function count_events( array $filters = array() ): int {
  * Count total terms in a taxonomy.
  *
  * Counts the number of non-empty terms in a specified taxonomy. Only counts
- * terms that are actually assigned to at least one published event.
+ * terms that are actually assigned to at least one published event from
+ * supported post types.
  *
  * Example usage:
  * $filters = array( 'taxonomy' => '_gatherpress_venue' );
@@ -522,12 +672,18 @@ function count_events( array $filters = array() ): int {
  * @return int Number of non-empty terms in the taxonomy.
  */
 function count_terms( array $filters = array() ): int {
+	$post_types = get_supported_post_types();
+	
+	if ( empty( $post_types ) ) {
+		return 0;
+	}
+	
 	// Type safety
 	$filters = is_array( $filters ) ? $filters : array();
 	$taxonomy = isset( $filters['taxonomy'] ) && is_string( $filters['taxonomy'] ) ? $filters['taxonomy'] : '';
 	
 	// Validate taxonomy parameter
-	if ( empty( $taxonomy ) || ! \taxonomy_exists( $taxonomy ) ) {
+	if ( empty( $taxonomy ) || ! taxonomy_exists( $taxonomy ) ) {
 		return 0;
 	}
 	
@@ -535,12 +691,27 @@ function count_terms( array $filters = array() ): int {
 	$args = array(
 		'taxonomy'   => sanitize_key( $taxonomy ),
 		'hide_empty' => true,  // Only count terms with posts
+		'object_ids' => null,  // Will filter by post type below
 	);
+	
+	// Get all post IDs from supported post types
+	$post_query = new \WP_Query(
+		array(
+			'post_type'      => $post_types,
+			'post_status'    => 'publish',
+			'posts_per_page' => -1,
+			'fields'         => 'ids',
+		)
+	);
+	
+	if ( ! empty( $post_query->posts ) ) {
+		$args['object_ids'] = $post_query->posts;
+	}
 	
 	$terms = \get_terms( $args );
 	
 	// Handle errors or empty results
-	if ( \is_wp_error( $terms ) || ! is_array( $terms ) ) {
+	if ( is_wp_error( $terms ) || ! is_array( $terms ) ) {
 		return 0;
 	}
 	
@@ -579,8 +750,9 @@ function count_terms( array $filters = array() ): int {
  * @return int Number of unique terms from count_taxonomy.
  */
 function terms_by_taxonomy( array $filters = array() ): int {
-	// Ensure the post type exists
-	if ( ! is_gatherpress_active() ) {
+	$post_types = get_supported_post_types();
+	
+	if ( empty( $post_types ) ) {
 		return 0;
 	}
 	
@@ -598,13 +770,13 @@ function terms_by_taxonomy( array $filters = array() ): int {
 	}
 	
 	// Validate taxonomies exist
-	if ( ! \taxonomy_exists( $count_taxonomy ) || ! \taxonomy_exists( $filter_taxonomy ) ) {
+	if ( ! taxonomy_exists( $count_taxonomy ) || ! taxonomy_exists( $filter_taxonomy ) ) {
 		return 0;
 	}
 	
 	// Step 1: Get all events in the filter taxonomy term
 	$args = array(
-		'post_type'      => 'gatherpress_event',
+		'post_type'      => $post_types,
 		'post_status'    => 'publish',
 		'posts_per_page' => -1,
 		'fields'         => 'ids',
@@ -624,10 +796,10 @@ function terms_by_taxonomy( array $filters = array() ): int {
 	if ( is_array( $query->posts ) ) {
 		foreach ( $query->posts as $post_id ) {
 			// Get all terms for this post in the count_taxonomy
-			$post_terms = \wp_get_post_terms( $post_id, sanitize_key( $count_taxonomy ), array( 'fields' => 'ids' ) );
+			$post_terms = wp_get_post_terms( $post_id, sanitize_key( $count_taxonomy ), array( 'fields' => 'ids' ) );
 			
 			// Accumulate term IDs
-			if ( ! \is_wp_error( $post_terms ) && is_array( $post_terms ) && ! empty( $post_terms ) ) {
+			if ( ! is_wp_error( $post_terms ) && is_array( $post_terms ) && ! empty( $post_terms ) ) {
 				$terms = array_merge( $terms, $post_terms );
 			}
 		}
@@ -641,9 +813,9 @@ function terms_by_taxonomy( array $filters = array() ): int {
 /**
  * Count total attendees with optional taxonomy filters and event query type.
  *
- * Sums the 'gatherpress_attendees_count' post meta across all matching events.
- * Supports filtering by single taxonomy term, multiple taxonomy terms, and
- * event query type (upcoming/past).
+ * Sums the 'gatherpress_attendees_count' post meta across all matching events
+ * from supported post types. Supports filtering by single taxonomy term,
+ * multiple taxonomy terms, and event query type (upcoming/past).
  *
  * Example with 15 events:
  * - Event 1: 25 attendees, Technology topic, upcoming
@@ -686,17 +858,18 @@ function terms_by_taxonomy( array $filters = array() ): int {
  * @return int Total number of attendees.
  */
 function count_attendees( array $filters = array() ): int {
-	// Ensure the post type exists
-	if ( ! is_gatherpress_active() ) {
+	$post_types = get_supported_post_types();
+	
+	if ( empty( $post_types ) ) {
 		return 0;
 	}
-	
 	// Type safety
 	$filters = is_array( $filters ) ? $filters : array();
 	
 	// Build base query arguments
 	$args = array(
-		'post_type'      => 'gatherpress_event',
+		'post_type'      => $post_types,
+		// 'post_type'      => 'gatherpress_event',
 		'post_status'    => 'publish',
 		'posts_per_page' => -1,
 		'fields'         => 'ids',
@@ -712,7 +885,7 @@ function count_attendees( array $filters = array() ): int {
 	
 	// Apply single taxonomy filter if provided
 	if ( ! empty( $filters['taxonomy'] ) && ! empty( $filters['term_id'] ) ) {
-		if ( \taxonomy_exists( $filters['taxonomy'] ) ) {
+		if ( taxonomy_exists( $filters['taxonomy'] ) ) {
 			$args['tax_query'] = array(
 				array(
 					'taxonomy' => sanitize_key( $filters['taxonomy'] ),
@@ -728,7 +901,7 @@ function count_attendees( array $filters = array() ): int {
 		$tax_query = array( 'relation' => 'AND' );
 		
 		foreach ( $filters['taxonomy_terms'] as $taxonomy => $term_ids ) {
-			if ( ! empty( $term_ids ) && is_array( $term_ids ) && \taxonomy_exists( $taxonomy ) ) {
+			if ( ! empty( $term_ids ) && is_array( $term_ids ) && taxonomy_exists( $taxonomy ) ) {
 				$tax_query[] = array(
 					'taxonomy' => sanitize_key( $taxonomy ),
 					'field'    => 'term_id',
@@ -751,7 +924,7 @@ function count_attendees( array $filters = array() ): int {
 	if ( is_array( $query->posts ) && ! empty( $query->posts ) ) {
 		foreach ( $query->posts as $post_id ) {
 			// Get the attendee count for this event
-			$attendee_count = \get_post_meta( $post_id, 'gatherpress_attendees_count', true );
+			$attendee_count = (int) get_post_meta( $post_id, 'gatherpress_attendees_count', true );
 			
 			// Add to total if it's a valid number
 			if ( is_numeric( $attendee_count ) ) {
@@ -773,11 +946,11 @@ function count_attendees( array $filters = array() ): int {
  * 1. Check if cached value exists (transient)
  * 2. If yes, return cached value
  * 3. If no, calculate value
- * 4. Store in cache for configured duration (default 12 hours)
+ * 4. Store in cache for 12 hours
  * 5. Return calculated value
  *
  * The cache is automatically invalidated when:
- * - Event post status changes to/from 'publish'
+ * - Events are created, updated, or deleted
  * - Taxonomy terms are modified
  * - Post meta (attendee counts) changes
  *
@@ -797,16 +970,24 @@ function get_cached( string $statistic_type, array $filters = array() ): int {
 		$filters = array();
 	}
 	
-	// Check if GatherPress is active
-	if ( ! is_gatherpress_active() ) {
+	// Check if any post types support statistics
+	if ( ! has_supported_post_types() ) {
 		return 0;
 	}
 	
+	// CRITICAL: Check if this statistic type is supported
+	if ( ! is_statistic_type_supported( $statistic_type ) ) {
+		return 0;
+	}
+
+	// Get configured cache expiration time
+	$expiration = get_cache_expiration();
+
 	// Generate unique cache key for this configuration
 	$cache_key = get_cache_key( $statistic_type, $filters );
 	
 	// Try to get cached value
-	$cached = \get_transient( $cache_key );
+	$cached = get_transient( $cache_key );
 	
 	// Validate cached value and return if valid
 	if ( false !== $cached && is_numeric( $cached ) ) {
@@ -820,7 +1001,7 @@ function get_cached( string $statistic_type, array $filters = array() ): int {
 	$value = is_numeric( $value ) ? absint( $value ) : 0;
 	
 	// Store in cache with configured expiration time
-	$expiration = get_cache_expiration();
+	// Note: Cache is cleared automatically on data changes
 	\set_transient( $cache_key, $value, $expiration );
 	
 	return $value;
@@ -832,6 +1013,9 @@ function get_cached( string $statistic_type, array $filters = array() ): int {
  * Generates an array of common statistic configurations that should be
  * pre-calculated and cached. This is called after cache clearing to ensure
  * frequently-used statistics are immediately available.
+ *
+ * This function respects the statistic type support configuration
+ * and only generates configurations for enabled types.
  *
  * This function respects the taxonomy exclusion filter and will not generate
  * statistics for excluded taxonomies. It generates statistics ONLY for both
@@ -861,19 +1045,31 @@ function get_cached( string $statistic_type, array $filters = array() ): int {
 function get_common_configs(): array {
 	$configs = array();
 	
+	// Get supported statistic types
+	$supported_types = get_supported_statistic_types();
+	
+	if ( empty( $supported_types ) ) {
+		return array();
+	}
+	
 	// Event query types to generate statistics for (ONLY upcoming and past, never empty/all)
 	$event_queries = array( 'upcoming', 'past' );
 	
-	// Basic statistics for each event query type
+	// Basic statistics for each event query type (only if supported)
 	foreach ( $event_queries as $event_query ) {
-		$configs[] = array(
-			'type'    => 'total_events',
-			'filters' => array( 'event_query' => $event_query ),
-		);
-		
+		if ( in_array( 'total_events', $supported_types, true ) ) {
+			$configs[] = array(
+				'type'    => 'total_events',
+				'filters' => array( 'event_query' => $event_query ),
+			);
+		}
+	}
+	
+	// CRITICAL: Total attendees should only be pre-generated for PAST events
+	if ( in_array( 'total_attendees', $supported_types, true ) ) {
 		$configs[] = array(
 			'type'    => 'total_attendees',
-			'filters' => array( 'event_query' => $event_query ),
+			'filters' => array( 'event_query' => 'past' ),
 		);
 	}
 	
@@ -890,11 +1086,13 @@ function get_common_configs(): array {
 			continue;
 		}
 		
-		// Total terms count for this taxonomy (doesn't vary by event query)
-		$configs[] = array(
-			'type'    => 'total_taxonomy_terms',
-			'filters' => array( 'taxonomy' => $taxonomy->name ),
-		);
+		// Total terms count for this taxonomy (only if supported)
+		if ( in_array( 'total_taxonomy_terms', $supported_types, true ) ) {
+			$configs[] = array(
+				'type'    => 'total_taxonomy_terms',
+				'filters' => array( 'taxonomy' => $taxonomy->name ),
+			);
+		}
 		
 		// Get all terms in this taxonomy
 		$terms = \get_terms(
@@ -904,7 +1102,7 @@ function get_common_configs(): array {
 			)
 		);
 		
-		if ( ! \is_wp_error( $terms ) && is_array( $terms ) && ! empty( $terms ) ) {
+		if ( ! is_wp_error( $terms ) && is_array( $terms ) && ! empty( $terms ) ) {
 			// Generate statistics for each term with each event query type
 			foreach ( $terms as $term ) {
 				if ( ! isset( $term->term_id ) ) {
@@ -918,16 +1116,24 @@ function get_common_configs(): array {
 						'event_query' => $event_query,
 					);
 					
-					// Events in this term
-					$configs[] = array(
-						'type'    => 'events_per_taxonomy',
-						'filters' => $filters,
-					);
-					
-					// Attendees at events in this term
+					// Events in this term (only if supported)
+					if ( in_array( 'events_per_taxonomy', $supported_types, true ) ) {
+						$configs[] = array(
+							'type'    => 'events_per_taxonomy',
+							'filters' => $filters,
+						);
+					}
+				}
+				
+				// CRITICAL: Attendees at events in this term - ONLY for PAST events
+				if ( in_array( 'total_attendees', $supported_types, true ) ) {
 					$configs[] = array(
 						'type'    => 'total_attendees',
-						'filters' => $filters,
+						'filters' => array(
+							'taxonomy'    => $taxonomy->name,
+							'term_id'     => $term->term_id,
+							'event_query' => 'past',
+						),
 					);
 				}
 			}
@@ -935,7 +1141,10 @@ function get_common_configs(): array {
 	}
 	
 	// Generate cross-taxonomy configurations if we have multiple taxonomies
-	if ( is_array( $taxonomies ) && count( $taxonomies ) > 1 ) {
+	// and if taxonomy_terms_by_taxonomy is supported
+	if ( in_array( 'taxonomy_terms_by_taxonomy', $supported_types, true ) 
+		&& is_array( $taxonomies ) 
+		&& count( $taxonomies ) > 1 ) {
 		$taxonomy_array = array_values( $taxonomies );
 		
 		// Loop through each pair of taxonomies
@@ -959,7 +1168,7 @@ function get_common_configs(): array {
 						)
 					);
 					
-					if ( ! \is_wp_error( $terms ) && is_array( $terms ) && ! empty( $terms ) ) {
+					if ( ! is_wp_error( $terms ) && is_array( $terms ) && ! empty( $terms ) ) {
 						foreach ( $terms as $term ) {
 							if ( ! isset( $term->term_id ) ) {
 								continue;
@@ -992,8 +1201,10 @@ function get_common_configs(): array {
  * without delay when visitors load the site, while preventing resource-heavy
  * operations during bulk edits.
  *
- * Only generates statistics for non-excluded taxonomies by using the filtered
- * taxonomy list. Only generates for upcoming and past events, never for all events.
+ * Only generates statistics for:
+ * - non-excluded taxonomies by using the filtered taxonomy list
+ * - upcoming and past events, never for all events.
+ * - enabled statistic types.
  *
  * Process:
  * 1. Get list of common configurations
@@ -1012,21 +1223,21 @@ function get_common_configs(): array {
  * @return void
  */
 function pregenerate_cache(): void {
-	// Only proceed if GatherPress is active
-	if ( ! is_gatherpress_active() ) {
+	// Only proceed if any post types support statistics
+	if ( ! has_supported_post_types() ) {
 		return;
 	}
 	
-	// Get array of common statistic configurations
+	// Get array of common statistic configurations (filtered by supported types)
 	$configs = get_common_configs();
 	
 	if ( ! is_array( $configs ) ) {
 		return;
 	}
-	
+
 	// Get configured cache expiration time
 	$expiration = get_cache_expiration();
-	
+
 	// Loop through each configuration and pre-generate
 	foreach ( $configs as $config ) {
 		// Validate configuration has required keys
@@ -1083,7 +1294,6 @@ function clear_cache(): void {
 	global $wpdb;
 	
 	// Delete all statistics transients from options table immediately
-	// This ensures fresh calculations when needed, but doesn't regenerate yet
 	$wpdb->query(
 		"DELETE FROM {$wpdb->options} 
 		WHERE option_name LIKE '_transient_gatherpress_stats_%' 
@@ -1091,13 +1301,13 @@ function clear_cache(): void {
 	);
 	
 	// Check if a regeneration job is already scheduled
-	$scheduled = \wp_next_scheduled( 'gatherpress_statistics_regenerate_cache' );
+	$scheduled = wp_next_scheduled( 'gatherpress_statistics_regenerate_cache' );
 	
 	// Only schedule if not already scheduled
 	if ( ! $scheduled ) {
 		// Schedule regeneration to run once, 60 seconds from now
 		// This prevents multiple regenerations during bulk operations
-		\wp_schedule_single_event(
+		wp_schedule_single_event(
 			time() + 60,
 			'gatherpress_statistics_regenerate_cache'
 		);
@@ -1112,14 +1322,14 @@ function clear_cache(): void {
  *
  * @since 0.1.0
  */
-\add_action( 'gatherpress_statistics_regenerate_cache', __NAMESPACE__ . '\pregenerate_cache' );
+add_action( 'gatherpress_statistics_regenerate_cache', __NAMESPACE__ . '\pregenerate_cache' );
 
 /**
  * Clear cache when event post status changes to or from 'publish'.
  *
  * Hooked to 'transition_post_status' action. This is more precise than
  * 'save_post' as it only triggers when the post status actually changes.
- * Clears all statistics caches whenever a GatherPress event is published
+ * Clears all statistics caches whenever a supported post type event is published
  * or unpublished. The actual regeneration happens 60 seconds later via cron.
  *
  * Examples of status transitions that trigger cache clearing:
@@ -1142,8 +1352,8 @@ function clear_cache_on_status_change( string $new_status, string $old_status, $
 		return;
 	}
 	
-	// Only proceed if this is a GatherPress event
-	if ( 'gatherpress_event' !== $post->post_type ) {
+	// Only proceed if this post type supports gatherpress_statistics
+	if ( ! post_type_supports( $post->post_type, 'gatherpress_statistics' ) ) {
 		return;
 	}
 	
@@ -1156,13 +1366,14 @@ function clear_cache_on_status_change( string $new_status, string $old_status, $
 		}
 	}
 }
-\add_action( 'transition_post_status', __NAMESPACE__ . '\clear_cache_on_status_change', 10, 3 );
+add_action( 'transition_post_status', __NAMESPACE__ . '\clear_cache_on_status_change', 10, 3 );
 
 /**
- * Clear cache when attendee count post meta is updated or added.
+ * Clear cache when attendee count post meta is updated.
  *
- * Hooked to post meta update and add actions. Clears all statistics caches when the
- * 'gatherpress_attendees_count' meta field is added or updated.
+ * Hooked to post meta update actions. Clears all statistics caches when the
+ * 'gatherpress_attendees_count' meta field is added or updated for posts 
+ * from supported post types.
  * The actual regeneration happens 60 seconds later via cron.
  *
  * @since 0.1.0
@@ -1173,42 +1384,44 @@ function clear_cache_on_status_change( string $new_status, string $old_status, $
  * @return void
  */
 function clear_cache_on_meta_update( int $meta_id, int $post_id, string $meta_key ): void {
-	// Only proceed if this is the attendees count meta for a GatherPress event
-	if ( 'gatherpress_attendees_count' === $meta_key && 'gatherpress_event' === \get_post_type( $post_id ) ) {
+	$post_type = get_post_type( $post_id );
+	
+	// Only proceed if this is the attendees count meta for a supported post type
+	if ( 'gatherpress_attendees_count' === $meta_key && post_type_supports( $post_type, 'gatherpress_statistics' ) ) {
 		clear_cache();
 	}
 }
-\add_action( 'updated_post_meta', __NAMESPACE__ . '\clear_cache_on_meta_update', 10, 3 );
-\add_action( 'added_post_meta', __NAMESPACE__ . '\clear_cache_on_meta_update', 10, 3 );
+add_action( 'updated_post_meta', __NAMESPACE__ . '\clear_cache_on_meta_update', 10, 3 );
+add_action( 'added_post_meta', __NAMESPACE__ . '\clear_cache_on_meta_update', 10, 3 );
 
 /**
  * Clear cache when attendee count post meta is deleted.
  *
- * Hooked to post meta delete action. Note that 'deleted_post_meta' passes
- * an array of meta IDs as the first parameter (unlike updated/added which pass a single ID).
- * Clears all statistics caches when the 'gatherpress_attendees_count' meta field is deleted.
- * The actual regeneration happens 60 seconds later via cron.
+ * The deleted_post_meta hook passes parameters differently - the first parameter
+ * is an array of meta IDs when bulk deleting. We need to handle this special case.
  *
  * @since 0.1.0
  *
- * @param array<int, int> $meta_ids  Array of deleted metadata entry IDs.
- * @param int             $post_id   Post ID.
- * @param string          $meta_key  Meta key that was deleted.
+ * @param array<int>|int $meta_ids Meta ID or array of meta IDs being deleted.
+ * @param int            $post_id  Post ID.
+ * @param string         $meta_key Meta key that was deleted.
  * @return void
  */
-function clear_cache_on_meta_delete( array $meta_ids, int $post_id, string $meta_key ): void {
-	// Only proceed if this is the attendees count meta for a GatherPress event
-	if ( 'gatherpress_attendees_count' === $meta_key && 'gatherpress_event' === \get_post_type( $post_id ) ) {
+function clear_cache_on_meta_delete( $meta_ids, int $post_id, string $meta_key ): void {
+	$post_type = get_post_type( $post_id );
+	
+	// Only proceed if this is the attendees count meta for a supported post type
+	if ( 'gatherpress_attendees_count' === $meta_key && post_type_supports( $post_type, 'gatherpress_statistics' ) ) {
 		clear_cache();
 	}
 }
-\add_action( 'deleted_post_meta', __NAMESPACE__ . '\clear_cache_on_meta_delete', 10, 3 );
+add_action( 'deleted_post_meta', __NAMESPACE__ . '\clear_cache_on_meta_delete', 10, 3 );
 
 /**
- * Clear cache when GatherPress taxonomy terms are modified.
+ * Clear cache when taxonomy terms are modified.
  *
  * Hooked to term creation, editing, and deletion actions. Clears all statistics
- * caches when terms in any GatherPress-related taxonomy are changed.
+ * caches when terms in any supported taxonomy are changed.
  * The actual regeneration happens 60 seconds later via cron.
  *
  * This function respects the exclusion filter - if a taxonomy is excluded,
@@ -1223,34 +1436,34 @@ function clear_cache_on_meta_delete( array $meta_ids, int $post_id, string $meta
  */
 function clear_cache_on_term_change( int $term_id, int $tt_id, string $taxonomy ): void {
 	// Get filtered taxonomies (excludes any taxonomies filtered out)
-	$gatherpress_taxonomies = get_filtered_taxonomies();
+	$supported_taxonomies = get_filtered_taxonomies();
 	
-	if ( empty( $gatherpress_taxonomies ) || ! is_array( $gatherpress_taxonomies ) ) {
+	if ( empty( $supported_taxonomies ) || ! is_array( $supported_taxonomies ) ) {
 		return;
 	}
 	
 	// Extract taxonomy slugs from objects
 	$taxonomy_slugs = array();
-	foreach ( $gatherpress_taxonomies as $tax_obj ) {
+	foreach ( $supported_taxonomies as $tax_obj ) {
 		if ( isset( $tax_obj->name ) ) {
 			$taxonomy_slugs[] = $tax_obj->name;
 		}
 	}
 	
-	// Only proceed if the changed term is in a non-excluded GatherPress taxonomy
+	// Only proceed if the changed term is in a supported taxonomy
 	if ( in_array( $taxonomy, $taxonomy_slugs, true ) ) {
 		clear_cache();
 	}
 }
-\add_action( 'create_term', __NAMESPACE__ . '\clear_cache_on_term_change', 10, 3 );
-\add_action( 'edit_term', __NAMESPACE__ . '\clear_cache_on_term_change', 10, 3 );
-\add_action( 'delete_term', __NAMESPACE__ . '\clear_cache_on_term_change', 10, 3 );
+add_action( 'create_term', __NAMESPACE__ . '\clear_cache_on_term_change', 10, 3 );
+add_action( 'edit_term', __NAMESPACE__ . '\clear_cache_on_term_change', 10, 3 );
+add_action( 'delete_term', __NAMESPACE__ . '\clear_cache_on_term_change', 10, 3 );
 
 /**
  * Clear cache when term relationships change.
  *
  * Hooked to 'set_object_terms' action. Clears all statistics caches when
- * taxonomy terms are assigned to or removed from GatherPress events.
+ * taxonomy terms are assigned to or removed from posts of supported post types.
  * The actual regeneration happens 60 seconds later via cron.
  *
  * @since 0.1.0
@@ -1261,24 +1474,23 @@ function clear_cache_on_term_change( int $term_id, int $tt_id, string $taxonomy 
  * @return void
  */
 function clear_cache_on_term_relationship( int $object_id, array $terms, array $tt_ids ): void {
-	// Only proceed if terms were assigned to a GatherPress event
-	if ( 'gatherpress_event' === \get_post_type( $object_id ) ) {
+	$post_type = get_post_type( $object_id );
+	
+	// Only proceed if terms were assigned to a supported post type
+	if ( post_type_supports( $post_type, 'gatherpress_statistics' ) ) {
 		clear_cache();
 	}
 }
-\add_action( 'set_object_terms', __NAMESPACE__ . '\clear_cache_on_term_relationship', 10, 3 );
+add_action( 'set_object_terms', __NAMESPACE__ . '\clear_cache_on_term_relationship', 10, 3 );
 
 /**
- * Provide filtered taxonomies to the block editor via REST API.
- *
- * This endpoint returns only the taxonomies that are not excluded by the filter,
- * ensuring the block editor respects the developer's exclusion preferences.
+ * Provide filtered taxonomies and supported statistic types to the block editor via REST API.
  *
  * @since 0.1.0
  *
  * @return void
  */
-function register_rest_route(): void {
+function register_rest_routes(): void {
 	\register_rest_route(
 		'gatherpress-statistics/v1',
 		'/taxonomies',
@@ -1286,12 +1498,24 @@ function register_rest_route(): void {
 			'methods'             => 'GET',
 			'callback'            => __NAMESPACE__ . '\get_taxonomies_endpoint',
 			'permission_callback' => function (): bool {
-				return \current_user_can( 'edit_posts' );
+				return current_user_can( 'edit_posts' );
+			},
+		)
+	);
+	
+	\register_rest_route(
+		'gatherpress-statistics/v1',
+		'/supported-types',
+		array(
+			'methods'             => 'GET',
+			'callback'            => __NAMESPACE__ . '\get_supported_types_endpoint',
+			'permission_callback' => function (): bool {
+				return current_user_can( 'edit_posts' );
 			},
 		)
 	);
 }
-\add_action( 'rest_api_init', __NAMESPACE__ . '\register_rest_route' );
+add_action( 'rest_api_init', __NAMESPACE__ . '\register_rest_routes' );
 
 /**
  * REST API endpoint callback to get filtered taxonomies.
@@ -1326,6 +1550,19 @@ function get_taxonomies_endpoint(): \WP_REST_Response {
 }
 
 /**
+ * REST API endpoint callback to get supported statistic types.
+ *
+ * @since 0.1.0
+ *
+ * @return \WP_REST_Response List of supported statistic types.
+ */
+function get_supported_types_endpoint(): \WP_REST_Response {
+	$supported_types = get_supported_statistic_types();
+	
+	return new \WP_REST_Response( $supported_types, 200 );
+}
+
+/**
  * Plugin activation hook.
  *
  * Runs when the plugin is activated. Schedules immediate cache regeneration
@@ -1337,14 +1574,14 @@ function get_taxonomies_endpoint(): \WP_REST_Response {
  */
 function activate_plugin(): void {
 	// Schedule immediate regeneration (runs in 5 seconds to avoid timeout)
-	if ( ! \wp_next_scheduled( 'gatherpress_statistics_regenerate_cache' ) ) {
-		\wp_schedule_single_event(
+	if ( ! wp_next_scheduled( 'gatherpress_statistics_regenerate_cache' ) ) {
+		wp_schedule_single_event(
 			time() + 5,
 			'gatherpress_statistics_regenerate_cache'
 		);
 	}
 }
-\register_activation_hook( __FILE__, __NAMESPACE__ . '\activate_plugin' );
+register_activation_hook( __FILE__, __NAMESPACE__ . '\activate_plugin' );
 
 /**
  * Plugin deactivation hook.
@@ -1368,9 +1605,9 @@ function deactivate_plugin(): void {
 	);
 	
 	// Clear any scheduled regeneration jobs
-	$scheduled = \wp_next_scheduled( 'gatherpress_statistics_regenerate_cache' );
+	$scheduled = wp_next_scheduled( 'gatherpress_statistics_regenerate_cache' );
 	if ( $scheduled ) {
-		\wp_unschedule_event( $scheduled, 'gatherpress_statistics_regenerate_cache' );
+		wp_unschedule_event( $scheduled, 'gatherpress_statistics_regenerate_cache' );
 	}
 }
-\register_deactivation_hook( __FILE__, __NAMESPACE__ . '\deactivate_plugin' );
+register_deactivation_hook( __FILE__, __NAMESPACE__ . '\deactivate_plugin' );
