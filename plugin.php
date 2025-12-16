@@ -1432,14 +1432,60 @@ function clear_cache_on_meta_delete( $meta_ids, int $post_id, string $meta_key )
 add_action( 'deleted_post_meta', __NAMESPACE__ . '\clear_cache_on_meta_delete', 10, 3 );
 
 /**
+ * Check if term changes require cache clearing.
+ *
+ * Determines whether a taxonomy term change should trigger cache clearing by checking
+ * if any statistic types that depend on term data are currently supported.
+ *
+ * The following statistic types require cache clearing for term changes:
+ * - events_per_taxonomy: Counts events in specific terms
+ * - events_multi_taxonomy: Filters by multiple terms
+ * - total_taxonomy_terms: Counts total terms
+ * - taxonomy_terms_by_taxonomy: Counts cross-taxonomy relationships
+ *
+ * @since 0.1.0
+ *
+ * @return bool True if any term-dependent statistic types are supported, false otherwise.
+ */
+function should_clear_cache_for_term_changes(): bool {
+	$supported_types = get_supported_statistic_types();
+	
+	if ( empty( $supported_types ) ) {
+		return false;
+	}
+	
+	// Statistic types that require cache clearing when terms change
+	$term_dependent_types = array(
+		'events_per_taxonomy',
+		'events_multi_taxonomy',
+		'total_taxonomy_terms',
+		'taxonomy_terms_by_taxonomy',
+	);
+	
+	// Check if any term-dependent types are supported
+	foreach ( $term_dependent_types as $type ) {
+		if ( in_array( $type, $supported_types, true ) ) {
+			return true;
+		}
+	}
+	
+	return false;
+}
+
+/**
  * Clear cache when taxonomy terms are modified.
  *
  * Hooked to term creation, editing, and deletion actions. Clears all statistics
- * caches when terms in any supported taxonomy are changed.
+ * caches when terms in any supported taxonomy are changed, but only if at least
+ * one statistic type that depends on term data is currently supported.
  * The actual regeneration happens 60 seconds later via cron.
  *
  * This function respects the exclusion filter - if a taxonomy is excluded,
  * changes to its terms won't trigger cache clearing.
+ *
+ * This function also checks if any term-dependent statistic types are supported
+ * before clearing cache. If none are supported (e.g., only total_events and
+ * total_attendees are enabled), term changes won't trigger cache clearing.
  *
  * @since 0.1.0
  *
@@ -1449,13 +1495,18 @@ add_action( 'deleted_post_meta', __NAMESPACE__ . '\clear_cache_on_meta_delete', 
  * @return void
  */
 function clear_cache_on_term_change( int $term_id, int $tt_id, string $taxonomy ): void {
-	// Get filtered taxonomies (excludes any taxonomies filtered out)
-	$supported_taxonomies = get_filtered_taxonomies();
-	
-	if ( empty( $supported_taxonomies ) || ! is_array( $supported_taxonomies ) ) {
+	// First check if any term-dependent statistic types are supported
+	if ( ! should_clear_cache_for_term_changes() ) {
 		return;
 	}
 	
+	// Get filtered taxonomies (excludes any taxonomies filtered out)
+	$supported_taxonomies = get_filtered_taxonomies();
+
+	if ( empty( $supported_taxonomies ) || ! is_array( $supported_taxonomies ) ) {
+		return;
+	}
+
 	// Extract taxonomy slugs from objects
 	$taxonomy_slugs = array();
 	foreach ( $supported_taxonomies as $tax_obj ) {
@@ -1463,7 +1514,7 @@ function clear_cache_on_term_change( int $term_id, int $tt_id, string $taxonomy 
 			$taxonomy_slugs[] = $tax_obj->name;
 		}
 	}
-	
+
 	// Only proceed if the changed term is in a supported taxonomy
 	if ( in_array( $taxonomy, $taxonomy_slugs, true ) ) {
 		clear_cache();
