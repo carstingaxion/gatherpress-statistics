@@ -71,7 +71,8 @@ if ( 'events_multi_taxonomy' === $statistic_type ) {
 }
 
 // Get cached statistic
-$count = \GatherPressStatistics\get_cached( $statistic_type, $filters );
+// $count = \GatherPressStatistics\get_cached( $statistic_type, $filters );
+$count = \GatherPress_Statistics\Setup::get_instance()->get_cached( $statistic_type, $filters );
 
 // Don't display if count is 0
 if ( $count === 0 ) {
