@@ -8,6 +8,8 @@ Contributors: carstenbach, WordPress Telex
 
 Display dynamically calculated statistics about your GatherPress events with beautiful, cached counters.
 
+[![Playground Demo Link](https://img.shields.io/badge/WordPress_Playground-blue?logo=wordpress&logoColor=%23fff&labelColor=%233858e9&color=%233858e9)](https://playground.wordpress.net/?blueprint-url=https://raw.githubusercontent.com/carstingaxion/gatherpress-statistics/main/.wordpress-org/blueprints/blueprint.json)
+
 ## Description
 
 The GatherPress Statistics block is a powerful tool  to provide statistics about your GatherPress events, venues, and topics with intelligent caching for optimal performance and a modular architecture that lets you control exactly which statistics are available.

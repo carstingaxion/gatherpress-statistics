@@ -1,0 +1,25 @@
+name: Playground PR Preview
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Post Playground Preview Button
+        uses: WordPress/action-wp-playground-pr-preview@v2
+        with:
+          # "append-to-description"  – add the button to the PR description
+          # "comment"           – create a new comment with the preview button
+          mode: "comment"
+
+          #
+          blueprint-url: https://raw.githubusercontent.com/carstingaxion/gatherpress-statistics/refs/heads/main/.wordpress-org/blueprints/blueprint.json
+
+          # Use "." if plugin is in repository root
+          plugin-path: .
+          github-token: ${{ secrets.GITHUB_TOKEN }}
