@@ -11,10 +11,10 @@ $event_query    = isset( $attributes['eventQuery'] ) ? $attributes['eventQuery']
 $show_label     = isset( $attributes['showLabel'] ) ? $attributes['showLabel'] : true;
 
 // Prefix and suffix settings
-$prefix_default      = isset( $attributes['prefixDefault'] ) ? $attributes['prefixDefault'] : '';
-$suffix_default      = isset( $attributes['suffixDefault'] ) ? $attributes['suffixDefault'] : '';
-$prefix_conditional  = isset( $attributes['prefixConditional'] ) ? $attributes['prefixConditional'] : '';
-$suffix_conditional  = isset( $attributes['suffixConditional'] ) ? $attributes['suffixConditional'] : '';
+$prefix_default        = isset( $attributes['prefixDefault'] ) ? $attributes['prefixDefault'] : '';
+$suffix_default        = isset( $attributes['suffixDefault'] ) ? $attributes['suffixDefault'] : '';
+$prefix_conditional    = isset( $attributes['prefixConditional'] ) ? $attributes['prefixConditional'] : '';
+$suffix_conditional    = isset( $attributes['suffixConditional'] ) ? $attributes['suffixConditional'] : '';
 $conditional_threshold = isset( $attributes['conditionalThreshold'] ) ? intval( $attributes['conditionalThreshold'] ) : 10;
 
 // CRITICAL: For total_attendees, always force eventQuery to 'past'
@@ -92,17 +92,23 @@ $display_label = ( 1 === $count ) ? $label_singular : $label_plural;
 	<data class="gatherpress-stats-value" value="<?php echo esc_attr( $count ); ?>">
 		<?php 
 		if ( ! empty( $display_prefix ) ) {
-			?><span class="gatherpress-stats-prefix"><?php echo esc_html( $display_prefix ); ?></span> <?php
+			?>
+			<span class="gatherpress-stats-prefix"><?php echo esc_html( $display_prefix ); ?></span> 
+			<?php
 		}
-		?><span class="gatherpress-stats-number"><?php echo esc_html( number_format_i18n( $count ) ); ?></span><?php
+		?>
+		<span class="gatherpress-stats-number"><?php echo esc_html( number_format_i18n( $count ) ); ?></span>
+		<?php
 		if ( ! empty( $display_suffix ) ) {
-			?> <span class="gatherpress-stats-suffix"><?php echo esc_html( $display_suffix ); ?></span><?php
+			?>
+			<span class="gatherpress-stats-suffix"><?php echo esc_html( $display_suffix ); ?></span>
+			<?php
 		}
 		?>
 	</data>
-	<?php if ( $show_label && ! empty( $display_label ) ) : ?>
+	<?php if ( $show_label && ! empty( $display_label ) ) { ?>
 		<figcaption class="gatherpress-stats-label">
 			<?php echo esc_html( $display_label ); ?>
 		</figcaption>
-	<?php endif; ?>
+	<?php } ?>
 </figure>

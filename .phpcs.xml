@@ -5,7 +5,29 @@
 	<file>.</file>
 	<arg name="basepath" value="./"/><!-- Strip the file paths down to the relevant bit -->
 
+	<exclude-pattern>*/build/*</exclude-pattern>
+	<exclude-pattern>*/vendor/*</exclude-pattern>
+	
 	<!-- Rules: figuren.theater Coding Standards -->
 	<rule ref="figurentheater" />
+
+	<!-- Allow additional text_domains -->
+	<rule ref="WordPress.WP.I18n">
+		<properties>
+			<property name="text_domain" type="array">
+				<element value="gatherpress-statistics"/>
+			</property>
+		</properties>
+	</rule>
+
+	<rule ref="WordPress.NamingConventions.PrefixAllGlobals">
+		<properties>
+			<property name="prefixes" type="array">
+				<element value="gatherpress"/>
+				<element value="__NAMESPACE__"/>
+			</property>
+
+		</properties>
+	</rule> 
 
 </ruleset>
