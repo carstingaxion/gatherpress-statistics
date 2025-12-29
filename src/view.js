@@ -5,7 +5,7 @@
  * and other interactive enhancements.
  */
 
-document.addEventListener( 'DOMContentLoaded', function () {
+document.addEventListener( 'DOMContentLoaded', function() {
 	const statBlocks = document.querySelectorAll(
 		'.wp-block-gatherpress-statistics'
 	);
@@ -18,7 +18,7 @@ document.addEventListener( 'DOMContentLoaded', function () {
 		if ( numberElement ) {
 			// Fade in animation for all blocks
 			numberElement.style.opacity = '0';
-			setTimeout( function () {
+			setTimeout( function() {
 				numberElement.style.transition = 'opacity 0.5s ease-in-out';
 				numberElement.style.opacity = '1';
 			}, 100 );
@@ -59,23 +59,23 @@ document.addEventListener( 'DOMContentLoaded', function () {
 		function createConfetti( delay ) {
 			const confetti = document.createElement( 'div' );
 			confetti.className = 'gatherpress-confetti-piece';
-
+			
 			// Random properties
 			const left = Math.random() * 100;
 			const size = Math.random() * 6 + 4;
 			const color = colors[ Math.floor( Math.random() * colors.length ) ];
 			const animationDuration = Math.random() * 2 + 2;
-			const animationDelay = delay || Math.random() * 0.5;
-
+			const animationDelay = delay || ( Math.random() * 0.5 );
+			
 			confetti.style.left = left + '%';
 			confetti.style.width = size + 'px';
 			confetti.style.height = size + 'px';
 			confetti.style.backgroundColor = color;
 			confetti.style.animationDuration = animationDuration + 's';
 			confetti.style.animationDelay = animationDelay + 's';
-
+			
 			confettiContainer.appendChild( confetti );
-
+			
 			// Remove confetti after animation completes
 			setTimeout(
 				function () {
@@ -93,7 +93,7 @@ document.addEventListener( 'DOMContentLoaded', function () {
 		function triggerConfetti() {
 			// Create 30 confetti pieces with staggered delays
 			for ( let i = 0; i < 30; i++ ) {
-				setTimeout( function () {
+				setTimeout( function() {
 					createConfetti( i * 0.05 );
 				}, i * 10 );
 			}
@@ -103,17 +103,17 @@ document.addEventListener( 'DOMContentLoaded', function () {
 		let isHovering = false;
 		let hoverTimeout;
 
-		block.addEventListener( 'mouseenter', function () {
+		block.addEventListener( 'mouseenter', function() {
 			isHovering = true;
 			// Delay slightly to avoid triggering on quick mouse movements
-			hoverTimeout = setTimeout( function () {
+			hoverTimeout = setTimeout( function() {
 				if ( isHovering ) {
 					triggerConfetti();
 				}
 			}, 100 );
 		} );
 
-		block.addEventListener( 'mouseleave', function () {
+		block.addEventListener( 'mouseleave', function() {
 			isHovering = false;
 			clearTimeout( hoverTimeout );
 		} );

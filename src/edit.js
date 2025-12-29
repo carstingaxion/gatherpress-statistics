@@ -3,7 +3,7 @@
  *
  * @see https://developer.wordpress.org/block-editor/reference-guides/packages/packages-i18n/
  */
-import { __ } from '@wordpress/i18n';
+import { __, sprintf } from '@wordpress/i18n';
 
 /**
  * React hook that is used to mark the block wrapper element.
@@ -156,7 +156,11 @@ export default function Edit( { attributes, setAttributes, clientId } ) {
 		// Build name based on statistic type
 		switch ( statisticType ) {
 			case 'total_events':
-				blockName = __( 'Total Events', 'gatherpress-statistics' );
+				blockName = sprintf(
+					/* translators: %s: plural post type label */
+					__( 'Total %s', 'gatherpress-statistics' ),
+					labelPlural
+				);
 				break;
 			case 'total_attendees':
 				blockName = __( 'Total Attendees', 'gatherpress-statistics' );
@@ -170,17 +174,24 @@ export default function Edit( { attributes, setAttributes, clientId } ) {
 						( t ) => t.id === selectedTerm
 					);
 					if ( taxonomy && term ) {
-						blockName = `${ taxonomy.name }: ${ term.name }`;
+						blockName = sprintf(
+							/* translators: 1: taxonomy name, 2: term name */
+							__( '%1$s: %2$s', 'gatherpress-statistics' ),
+							taxonomy.name,
+							term.name
+						);
 					} else {
-						blockName = __(
-							'Events per Taxonomy',
-							'gatherpress-statistics'
+						blockName = sprintf(
+							/* translators: %s: plural post type label */
+							__( '%s per Taxonomy', 'gatherpress-statistics' ),
+							labelPlural
 						);
 					}
 				} else {
-					blockName = __(
-						'Events per Taxonomy',
-						'gatherpress-statistics'
+					blockName = sprintf(
+						/* translators: %s: plural post type label */
+						__( '%s per Taxonomy', 'gatherpress-statistics' ),
+						labelPlural
 					);
 				}
 				break;
@@ -206,20 +217,24 @@ export default function Edit( { attributes, setAttributes, clientId } ) {
 						}
 					);
 					if ( termNames.length > 0 ) {
-						blockName =
-							__( 'Events:', 'gatherpress-statistics' ) +
-							' ' +
-							termNames.join( ', ' );
+						blockName = sprintf(
+							/* translators: 1: plural post type label, 2: comma-separated list of terms */
+							__( '%1$s: %2$s', 'gatherpress-statistics' ),
+							labelPlural,
+							termNames.join( ', ' )
+						);
 					} else {
-						blockName = __(
-							'Events (Multiple Taxonomies)',
-							'gatherpress-statistics'
+						blockName = sprintf(
+							/* translators: %s: plural post type label */
+							__( '%s (Multiple Taxonomies)', 'gatherpress-statistics' ),
+							labelPlural
 						);
 					}
 				} else {
-					blockName = __(
-						'Events (Multiple Taxonomies)',
-						'gatherpress-statistics'
+					blockName = sprintf(
+						/* translators: %s: plural post type label */
+						__( '%s (Multiple Taxonomies)', 'gatherpress-statistics' ),
+						labelPlural
 					);
 				}
 				break;
@@ -229,10 +244,11 @@ export default function Edit( { attributes, setAttributes, clientId } ) {
 						( t ) => t.slug === selectedTaxonomy
 					);
 					if ( taxonomy ) {
-						blockName =
-							__( 'Total', 'gatherpress-statistics' ) +
-							' ' +
-							taxonomy.name;
+						blockName = sprintf(
+							/* translators: %s: taxonomy name */
+							__( 'Total %s', 'gatherpress-statistics' ),
+							taxonomy.name
+						);
 					} else {
 						blockName = __(
 							'Total Taxonomy Terms',
@@ -258,7 +274,13 @@ export default function Edit( { attributes, setAttributes, clientId } ) {
 						( t ) => t.id === selectedTerm
 					);
 					if ( countTax && filterTax && term ) {
-						blockName = `${ countTax.name } in ${ filterTax.name }: ${ term.name }`;
+						blockName = sprintf(
+							/* translators: 1: count taxonomy name, 2: filter taxonomy name, 3: term name */
+							__( '%1$s in %2$s: %3$s', 'gatherpress-statistics' ),
+							countTax.name,
+							filterTax.name,
+							term.name
+						);
 					} else {
 						blockName = __(
 							'Taxonomy Terms by Taxonomy',
@@ -281,18 +303,25 @@ export default function Edit( { attributes, setAttributes, clientId } ) {
 
 		// CRITICAL: For total_attendees, always add "Past:" prefix since it only shows past events
 		if ( statisticType === 'total_attendees' ) {
-			blockName =
-				__( 'Past', 'gatherpress-statistics' ) + ': ' + blockName;
+			blockName = sprintf(
+				/* translators: %s: statistic name */
+				__( 'Past: %s', 'gatherpress-statistics' ),
+				blockName
+			);
 		} else {
 			// For other types, add event query type to name
 			if ( eventQuery === 'upcoming' ) {
-				blockName =
-					__( 'Upcoming', 'gatherpress-statistics' ) +
-					': ' +
-					blockName;
+				blockName = sprintf(
+					/* translators: %s: statistic name */
+					__( 'Upcoming: %s', 'gatherpress-statistics' ),
+					blockName
+				);
 			} else if ( eventQuery === 'past' ) {
-				blockName =
-					__( 'Past', 'gatherpress-statistics' ) + ': ' + blockName;
+				blockName = sprintf(
+					/* translators: %s: statistic name */
+					__( 'Past: %s', 'gatherpress-statistics' ),
+					blockName
+				);
 			}
 		}
 
@@ -316,12 +345,17 @@ export default function Edit( { attributes, setAttributes, clientId } ) {
 		allTaxonomyTerms,
 		clientId,
 		updateBlockAttributes,
+		labelPlural,
 	] );
 
 	// Build statistic type options - filter by what's supported
 	const allStatisticTypeOptions = [
 		{
-			label: __( 'Total Events', 'gatherpress-statistics' ),
+			label: sprintf(
+				/* translators: %s: plural post type label */
+				__( 'Total %s', 'gatherpress-statistics' ),
+				labelPlural
+			),
 			value: 'total_events',
 		},
 		{
@@ -329,13 +363,18 @@ export default function Edit( { attributes, setAttributes, clientId } ) {
 			value: 'total_attendees',
 		},
 		{
-			label: __( 'Events per Taxonomy Term', 'gatherpress-statistics' ),
+			label: sprintf(
+				/* translators: %s: plural post type label */
+				__( '%s per Taxonomy Term', 'gatherpress-statistics' ),
+				labelPlural
+			),
 			value: 'events_per_taxonomy',
 		},
 		{
-			label: __(
-				'Events (Multiple Taxonomies)',
-				'gatherpress-statistics'
+			label: sprintf(
+				/* translators: %s: plural post type label */
+				__( '%s (Multiple Taxonomies)', 'gatherpress-statistics' ),
+				labelPlural
 			),
 			value: 'events_multi_taxonomy',
 		},
@@ -464,13 +503,21 @@ export default function Edit( { attributes, setAttributes, clientId } ) {
 							}
 							help={
 								eventQuery === 'upcoming'
-									? __(
-											'Showing statistics for upcoming events',
-											'gatherpress-statistics'
+									? sprintf(
+											/* translators: %s: plural post type label */
+											__(
+												'Showing statistics for upcoming %s',
+												'gatherpress-statistics'
+											),
+											labelPlural.toLowerCase()
 									  )
-									: __(
-											'Showing statistics for past events',
-											'gatherpress-statistics'
+									: sprintf(
+											/* translators: %s: plural post type label */
+											__(
+												'Showing statistics for past %s',
+												'gatherpress-statistics'
+											),
+											labelPlural.toLowerCase()
 									  )
 							}
 						/>
@@ -669,7 +716,7 @@ export default function Edit( { attributes, setAttributes, clientId } ) {
 																( t ) =>
 																	t.id ===
 																	selectedTerm
-															)?.name,
+																)?.name,
 													  ].filter( Boolean )
 													: []
 											}
@@ -685,7 +732,7 @@ export default function Edit( { attributes, setAttributes, clientId } ) {
 															( t ) =>
 																t.name ===
 																tokens[ 0 ]
-														);
+															);
 													if ( term ) {
 														setAttributes( {
 															selectedTerm:

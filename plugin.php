@@ -225,6 +225,7 @@ class Database {
 		$sql = 
 				"CREATE TABLE {$table_name} (
 				id mediumint(10) UNSIGNED NOT NULL AUTO_INCREMENT,
+				post_type varchar(20) NOT NULL DEFAULT 'gatherpress_event',
 				statistic_type varchar(100) NOT NULL,
 				statistic_year smallint UNSIGNED NOT NULL,
 				statistic_month tinyint UNSIGNED NOT NULL,
@@ -233,6 +234,7 @@ class Database {
 				statistic_value bigint(20) NOT NULL DEFAULT 0,
 				archived_at datetime NULL DEFAULT NULL,
 				PRIMARY KEY  (id),
+				KEY post_type (post_type),
 				KEY statistic_lookup (statistic_type, statistic_year, statistic_month),
 				KEY statistic_year_month (statistic_year, statistic_month),
 				KEY filters_lookup (filters_hash)
@@ -398,6 +400,42 @@ class Support {
 		
 		return post_type_supports( $post->post_type, 'gatherpress_statistics' ) 
 			&& $post->post_status === 'publish';
+	}
+
+	/**
+	 * Get singular label for a post type.
+	 *
+	 * @since 0.1.0
+	 *
+	 * @param string $post_type Post type slug.
+	 * @return string Singular label.
+	 */
+	public function get_post_type_singular_label( string $post_type ): string {
+		$post_type_object = get_post_type_object( $post_type );
+		
+		if ( $post_type_object && isset( $post_type_object->labels->singular_name ) ) {
+			return $post_type_object->labels->singular_name;
+		}
+		
+		return __( 'Item', 'gatherpress-statistics' );
+	}
+
+	/**
+	 * Get plural label for a post type.
+	 *
+	 * @since 0.1.0
+	 *
+	 * @param string $post_type Post type slug.
+	 * @return string Plural label.
+	 */
+	public function get_post_type_plural_label( string $post_type ): string {
+		$post_type_object = get_post_type_object( $post_type );
+		
+		if ( $post_type_object && isset( $post_type_object->labels->name ) ) {
+			return $post_type_object->labels->name;
+		}
+		
+		return __( 'Items', 'gatherpress-statistics' );
 	}
 }
 
@@ -1763,7 +1801,7 @@ class AdminPage {
 	 */
 	public function register_admin_page(): void {
 		add_dashboard_page(
-			__( 'GatherPress Statistics Archive', 'gatherpress-statistics' ),
+			__( 'Statistics Archive', 'gatherpress-statistics' ),
 			__( 'Statistics Archive', 'gatherpress-statistics' ),
 			'manage_options',
 			'gatherpress-statistics-archive',
@@ -1833,10 +1871,14 @@ class AdminPage {
 	 * @return string Human-readable label.
 	 */
 	private function get_statistic_type_label( string $type ): string {
+		$post_types = Support::get_instance()->get_supported_post_types();
+		$post_type = ! empty( $post_types ) ? $post_types[0] : 'gatherpress_event';
+		$plural_label = Support::get_instance()->get_post_type_plural_label( $post_type );
+
 		$labels = array(
-			'total_events'                => __( 'Total Events', 'gatherpress-statistics' ),
-			'events_per_taxonomy'         => __( 'Events per Taxonomy', 'gatherpress-statistics' ),
-			'events_multi_taxonomy'       => __( 'Events (Multiple Taxonomies)', 'gatherpress-statistics' ),
+			'total_events'                => sprintf( __( 'Total %s', 'gatherpress-statistics' ), $plural_label ),
+			'events_per_taxonomy'         => sprintf( __( '%s per Taxonomy', 'gatherpress-statistics' ), $plural_label ),
+			'events_multi_taxonomy'       => sprintf( __( '%s (Multiple Taxonomies)', 'gatherpress-statistics' ), $plural_label ),
 			'total_taxonomy_terms'        => __( 'Total Taxonomy Terms', 'gatherpress-statistics' ),
 			'taxonomy_terms_by_taxonomy'  => __( 'Taxonomy Terms by Taxonomy', 'gatherpress-statistics' ),
 			'total_attendees'             => __( 'Total Attendees', 'gatherpress-statistics' ),
@@ -2487,6 +2529,8 @@ class Archive {
 		}
 
 		$success_count = 0;
+		$post_types = Support::get_instance()->get_supported_post_types();
+		$post_type = ! empty( $post_types ) ? $post_types[0] : 'gatherpress_event';
 		
 		foreach ( $configs as $config ) {
 			if ( ! isset( $config['type'] ) || ! isset( $config['filters'] ) ) {
@@ -2506,10 +2550,12 @@ class Archive {
 			$exists = $wpdb->get_var(
 				$wpdb->prepare(
 					"SELECT id FROM {$table_name} 
-					 WHERE statistic_type = %s 
+					 WHERE post_type = %s
+					 AND statistic_type = %s 
 					 AND statistic_year = %d 
 					 AND statistic_month = %d 
 					 AND filters_hash = %s",
+					$post_type,
 					$config['type'],
 					$year,
 					$month,
@@ -2532,6 +2578,7 @@ class Archive {
 				$result = $wpdb->insert(
 					$table_name,
 					array(
+						'post_type'       => $post_type,
 						'statistic_type'  => $config['type'],
 						'statistic_year'  => $year,
 						'statistic_month' => $month,
@@ -2540,7 +2587,7 @@ class Archive {
 						'statistic_value' => $value,
 						'archived_at'     => $current_time,
 					),
-					array( '%s', '%d', '%d', '%s', '%s', '%d', '%s' )
+					array( '%s', '%s', '%d', '%d', '%s', '%s', '%d', '%s' )
 				);
 			}
 

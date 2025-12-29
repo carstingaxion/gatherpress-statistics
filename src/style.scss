@@ -47,7 +47,7 @@
 	// Minimal style variation
 	&.is-style-minimal {
 		padding: var(--wp--preset--spacing--30, 1rem);
-
+		
 		.gatherpress-stats-value {
 			font-size: 0.85em;
 			margin-bottom: var(--wp--preset--spacing--10, 0.25rem);
@@ -114,13 +114,11 @@
 }
 
 @keyframes confetti-fall {
-
 	0% {
 		top: -10%;
 		opacity: 1;
 		transform: translateX(0) rotateZ(0deg);
 	}
-
 	100% {
 		top: 110%;
 		opacity: 0;
