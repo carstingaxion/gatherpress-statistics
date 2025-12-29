@@ -75,6 +75,7 @@ class Plugin {
 		add_action( 'rest_api_init', array( $this, 'register_rest_routes' ) );
 		add_action( 'admin_menu', array( $this, 'register_admin_page' ) );
 		add_action( 'admin_init', array( $this, 'handle_manual_archive_generation' ) );
+		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_assets' ) );
 		add_action( 'gatherpress_statistics_regenerate_cache', array( $this, 'pregenerate_cache' ) );
 		add_action( 'gatherpress_statistics_monthly_archive', array( $this, 'archive_monthly_statistics' ) );
 		add_action( 'transition_post_status', array( $this, 'clear_cache_on_status_change' ), 10, 3 );
@@ -86,6 +87,29 @@ class Plugin {
 		add_action( 'delete_term', array( $this, 'clear_cache_on_term_change' ), 10, 3 );
 		add_action( 'set_object_terms', array( $this, 'clear_cache_on_term_relationship' ), 10, 3 );
 		add_filter( 'posts_where', array( $this, 'filter_gatherpress_event_dates' ), 10, 2 );
+	}
+
+	/**
+	 * Enqueue admin assets.
+	 *
+	 * @since 0.1.0
+	 *
+	 * @param string $hook Current admin page hook.
+	 * @return void
+	 */
+	public function enqueue_admin_assets( string $hook ): void {
+		if ( 'dashboard_page_gatherpress-statistics-archive' !== $hook ) {
+			return;
+		}
+
+		// Enqueue Chart.js from CDN
+		wp_enqueue_script(
+			'chartjs',
+			'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js',
+			array(),
+			'4.4.1',
+			true
+		);
 	}
 
 	/**
@@ -359,13 +383,17 @@ class Plugin {
 		$selected_month = isset( $_GET['month'] ) ? absint( $_GET['month'] ) : null;
 		$selected_taxonomy = isset( $_GET['taxonomy'] ) ? sanitize_text_field( $_GET['taxonomy'] ) : null;
 		$selected_term = isset( $_GET['term_id'] ) ? absint( $_GET['term_id'] ) : null;
-		$selected_type = isset( $_GET['stat_type'] ) ? sanitize_text_field( $_GET['stat_type'] ) : '';
-		$current_tab = isset( $_GET['tab'] ) ? sanitize_text_field( $_GET['tab'] ) : 'all';
+		$current_tab = isset( $_GET['tab'] ) ? sanitize_text_field( $_GET['tab'] ) : '';
 		$order_by = isset( $_GET['orderby'] ) ? sanitize_text_field( $_GET['orderby'] ) : 'statistic_year';
 		$order = isset( $_GET['order'] ) && $_GET['order'] === 'asc' ? 'ASC' : 'DESC';
 		
 		// Get supported statistic types for tabs
 		$supported_types = $this->get_supported_statistic_types();
+		
+		// Default to first supported type if no tab selected
+		if ( empty( $current_tab ) && ! empty( $supported_types ) ) {
+			$current_tab = $supported_types[0];
+		}
 		
 		// Get available years
 		$years = $wpdb->get_col( "SELECT DISTINCT statistic_year FROM {$table_name} ORDER BY statistic_year DESC" );
@@ -386,7 +414,7 @@ class Plugin {
 		$query_params = array();
 		
 		// Filter by tab (statistic type)
-		if ( 'all' !== $current_tab && ! empty( $current_tab ) ) {
+		if ( ! empty( $current_tab ) ) {
 			$where_clauses[] = 'statistic_type = %s';
 			$query_params[] = $current_tab;
 		}
@@ -418,7 +446,7 @@ class Plugin {
 		$where_sql = ! empty( $where_clauses ) ? 'WHERE ' . implode( ' AND ', $where_clauses ) : '';
 		
 		// Validate order_by
-		$allowed_order_by = array( 'statistic_year', 'statistic_month', 'statistic_value', 'archived_at' );
+		$allowed_order_by = array( 'statistic_year', 'statistic_month', 'statistic_value', 'archived_at', 'taxonomy', 'term' );
 		if ( ! in_array( $order_by, $allowed_order_by, true ) ) {
 			$order_by = 'statistic_year';
 		}
@@ -451,6 +479,9 @@ class Plugin {
 		
 		// Toggle order direction
 		$next_order = ( $order === 'ASC' ) ? 'desc' : 'asc';
+		
+		// Prepare chart data
+		$chart_data = $this->prepare_chart_data( $statistics, $current_tab );
 		
 		// Render page
 		?>
@@ -505,12 +536,7 @@ class Plugin {
 			
 			<h2><?php esc_html_e( 'Archived Statistics', 'gatherpress-statistics' ); ?></h2>
 			
-			<!-- Tabs for statistic types -->
 			<h2 class="nav-tab-wrapper">
-				<a href="<?php echo esc_url( add_query_arg( 'tab', 'all', remove_query_arg( array( 'orderby', 'order' ), $base_url ) ) ); ?>" 
-				   class="nav-tab <?php echo 'all' === $current_tab ? 'nav-tab-active' : ''; ?>">
-					<?php esc_html_e( 'All Statistics', 'gatherpress-statistics' ); ?>
-				</a>
 				<?php foreach ( $supported_types as $type ) : ?>
 					<a href="<?php echo esc_url( add_query_arg( 'tab', $type, remove_query_arg( array( 'orderby', 'order' ), $base_url ) ) ); ?>" 
 					   class="nav-tab <?php echo $type === $current_tab ? 'nav-tab-active' : ''; ?>">
@@ -518,6 +544,142 @@ class Plugin {
 					</a>
 				<?php endforeach; ?>
 			</h2>
+			
+			<?php if ( ! empty( $chart_data ) ) : ?>
+				<div class="gatherpress-stats-chart-container">
+					<div class="gatherpress-stats-chart-controls">
+						<h3><?php esc_html_e( 'Visual Comparison', 'gatherpress-statistics' ); ?></h3>
+						<div id="gatherpress-term-toggles"></div>
+					</div>
+					<canvas id="gatherpress-stats-chart" width="400" height="150"></canvas>
+				</div>
+				<?php
+				// Inline admin styles
+				?>
+				<style>
+					.gatherpress-stats-chart-container {
+						margin: 20px 0;
+						padding: 20px;
+						background: #fff;
+						border: 1px solid #ccd0d4;
+						box-shadow: 0 1px 1px rgba(0,0,0,.04);
+					}
+					.gatherpress-stats-chart-controls {
+						margin-bottom: 20px;
+					}
+					.gatherpress-stats-chart-controls h3 {
+						margin: 0 0 10px 0;
+						font-size: 14px;
+						font-weight: 600;
+					}
+					#gatherpress-term-toggles {
+						display: flex;
+						flex-wrap: wrap;
+						gap: 10px;
+					}
+					.term-toggle {
+						display: inline-flex;
+						align-items: center;
+						gap: 5px;
+						padding: 5px 10px;
+						border: 1px solid #ddd;
+						border-radius: 3px;
+						cursor: pointer;
+						background: #f7f7f7;
+						transition: all 0.2s;
+					}
+					.term-toggle:hover {
+						background: #e9e9e9;
+					}
+					.term-toggle.active {
+						background: #fff;
+						border-color: #0073aa;
+					}
+					.term-color-box {
+						width: 16px;
+						height: 16px;
+						border-radius: 2px;
+					}
+					.sortable-column a {
+						text-decoration: none;
+					}
+					.sortable-column .dashicons {
+						width: 14px;
+						height: 14px;
+						font-size: 14px;
+					}
+				</style>
+				<?php
+				// Inline admin JavaScript
+				?>
+				<script type="text/javascript">
+					var gatherpressChartData = <?php echo wp_json_encode( $chart_data ); ?>;
+					
+					jQuery(document).ready(function($) {
+						if (typeof Chart === 'undefined' || !gatherpressChartData) {
+							return;
+						}
+
+						var ctx = document.getElementById('gatherpress-stats-chart');
+						if (!ctx) return;
+
+						var chartConfig = {
+							type: 'line',
+							data: {
+								labels: gatherpressChartData.labels,
+								datasets: gatherpressChartData.datasets
+							},
+							options: {
+								responsive: true,
+								maintainAspectRatio: true,
+								plugins: {
+									legend: {
+										display: false
+									},
+									tooltip: {
+										mode: 'index',
+										intersect: false
+									}
+								},
+								scales: {
+									y: {
+										beginAtZero: true
+									}
+								}
+							}
+						};
+
+						var chart = new Chart(ctx, chartConfig);
+
+						var togglesContainer = document.getElementById('gatherpress-term-toggles');
+						if (!togglesContainer) return;
+
+						gatherpressChartData.datasets.forEach(function(dataset, index) {
+							var toggle = document.createElement('div');
+							toggle.className = 'term-toggle active';
+							toggle.setAttribute('data-index', index);
+
+							var colorBox = document.createElement('div');
+							colorBox.className = 'term-color-box';
+							colorBox.style.backgroundColor = dataset.borderColor;
+
+							var label = document.createElement('span');
+							label.textContent = dataset.label;
+
+							toggle.appendChild(colorBox);
+							toggle.appendChild(label);
+							togglesContainer.appendChild(toggle);
+
+							toggle.addEventListener('click', function() {
+								var meta = chart.getDatasetMeta(index);
+								meta.hidden = !meta.hidden;
+								toggle.classList.toggle('active');
+								chart.update();
+							});
+						});
+					});
+				</script>
+			<?php endif; ?>
 			
 			<div class="tablenav top">
 				<form method="get">
@@ -599,11 +761,22 @@ class Plugin {
 									<?php endif; ?>
 								</a>
 							</th>
-							<?php if ( 'all' === $current_tab ) : ?>
-								<th><?php esc_html_e( 'Statistic Type', 'gatherpress-statistics' ); ?></th>
-							<?php endif; ?>
-							<th><?php esc_html_e( 'Taxonomy', 'gatherpress-statistics' ); ?></th>
-							<th><?php esc_html_e( 'Term', 'gatherpress-statistics' ); ?></th>
+							<th class="sortable-column">
+								<a href="<?php echo esc_url( add_query_arg( array( 'orderby' => 'taxonomy', 'order' => $next_order ), $base_url ) ); ?>">
+									<?php esc_html_e( 'Taxonomy', 'gatherpress-statistics' ); ?>
+									<?php if ( $order_by === 'taxonomy' ) : ?>
+										<span class="dashicons dashicons-arrow-<?php echo $order === 'ASC' ? 'up' : 'down'; ?>"></span>
+									<?php endif; ?>
+								</a>
+							</th>
+							<th class="sortable-column">
+								<a href="<?php echo esc_url( add_query_arg( array( 'orderby' => 'term', 'order' => $next_order ), $base_url ) ); ?>">
+									<?php esc_html_e( 'Term', 'gatherpress-statistics' ); ?>
+									<?php if ( $order_by === 'term' ) : ?>
+										<span class="dashicons dashicons-arrow-<?php echo $order === 'ASC' ? 'up' : 'down'; ?>"></span>
+									<?php endif; ?>
+								</a>
+							</th>
 							<th>
 								<a href="<?php echo esc_url( add_query_arg( array( 'orderby' => 'statistic_value', 'order' => $next_order ), $base_url ) ); ?>">
 									<?php esc_html_e( 'Value', 'gatherpress-statistics' ); ?>
@@ -623,7 +796,41 @@ class Plugin {
 						</tr>
 					</thead>
 					<tbody>
-						<?php foreach ( $statistics as $stat ) : 
+						<?php 
+						// Sort data for taxonomy/term columns if needed
+						if ( in_array( $order_by, array( 'taxonomy', 'term' ), true ) ) {
+							usort( $statistics, function( $a, $b ) use ( $order_by, $order ) {
+								$filters_a = json_decode( $a->filters_data, true );
+								$filters_b = json_decode( $b->filters_data, true );
+								
+								if ( 'taxonomy' === $order_by ) {
+									$val_a = isset( $filters_a['taxonomy'] ) ? $filters_a['taxonomy'] : '';
+									$val_b = isset( $filters_b['taxonomy'] ) ? $filters_b['taxonomy'] : '';
+								} else {
+									$val_a = '';
+									$val_b = '';
+									
+									if ( isset( $filters_a['term_id'] ) ) {
+										$term = get_term( $filters_a['term_id'] );
+										if ( $term && ! is_wp_error( $term ) ) {
+											$val_a = $term->name;
+										}
+									}
+									
+									if ( isset( $filters_b['term_id'] ) ) {
+										$term = get_term( $filters_b['term_id'] );
+										if ( $term && ! is_wp_error( $term ) ) {
+											$val_b = $term->name;
+										}
+									}
+								}
+								
+								$result = strcasecmp( $val_a, $val_b );
+								return ( 'ASC' === $order ) ? $result : -$result;
+							} );
+						}
+						
+						foreach ( $statistics as $stat ) : 
 							$filters = json_decode( $stat->filters_data, true );
 							$taxonomy_name = '';
 							$term_name = '';
@@ -645,9 +852,6 @@ class Plugin {
 							<tr>
 								<td><?php echo esc_html( $stat->statistic_year ); ?></td>
 								<td><?php echo esc_html( date_i18n( 'F', mktime( 0, 0, 0, $stat->statistic_month, 1 ) ) ); ?></td>
-								<?php if ( 'all' === $current_tab ) : ?>
-									<td><?php echo esc_html( $this->get_statistic_type_label( $stat->statistic_type ) ); ?></td>
-								<?php endif; ?>
 								<td><?php echo esc_html( $taxonomy_name ); ?></td>
 								<td><?php echo esc_html( $term_name ); ?></td>
 								<td><strong><?php echo esc_html( number_format_i18n( $stat->statistic_value ) ); ?></strong></td>
@@ -659,6 +863,93 @@ class Plugin {
 			<?php endif; ?>
 		</div>
 		<?php
+	}
+
+	/**
+	 * Prepare chart data from statistics.
+	 *
+	 * @since 0.1.0
+	 *
+	 * @param array  $statistics Array of statistics from database.
+	 * @param string $type       Current statistic type.
+	 * @return array Chart data structure.
+	 */
+	private function prepare_chart_data( array $statistics, string $type ): array {
+		if ( empty( $statistics ) ) {
+			return array();
+		}
+
+		// Group data by term
+		$data_by_term = array();
+		$all_dates = array();
+
+		foreach ( $statistics as $stat ) {
+			$filters = json_decode( $stat->filters_data, true );
+			$date_key = sprintf( '%d-%02d', $stat->statistic_year, $stat->statistic_month );
+			$all_dates[ $date_key ] = true;
+
+			$term_label = 'All';
+			$term_id = 0;
+
+			if ( isset( $filters['term_id'] ) && $filters['term_id'] > 0 ) {
+				$term = get_term( $filters['term_id'] );
+				if ( $term && ! is_wp_error( $term ) ) {
+					$term_label = $term->name;
+					$term_id = $term->term_id;
+				}
+			}
+
+			if ( ! isset( $data_by_term[ $term_id ] ) ) {
+				$data_by_term[ $term_id ] = array(
+					'label' => $term_label,
+					'data' => array(),
+				);
+			}
+
+			$data_by_term[ $term_id ]['data'][ $date_key ] = $stat->statistic_value;
+		}
+
+		// Sort dates
+		$dates = array_keys( $all_dates );
+		sort( $dates );
+
+		// Build datasets
+		$datasets = array();
+		$colors = array(
+			'#3366CC', '#DC3912', '#FF9900', '#109618', '#990099',
+			'#3B3EAC', '#0099C6', '#DD4477', '#66AA00', '#B82E2E',
+		);
+		$color_index = 0;
+
+		foreach ( $data_by_term as $term_id => $term_data ) {
+			$values = array();
+			foreach ( $dates as $date ) {
+				$values[] = isset( $term_data['data'][ $date ] ) ? $term_data['data'][ $date ] : 0;
+			}
+
+			$color = $colors[ $color_index % count( $colors ) ];
+			$color_index++;
+
+			$datasets[] = array(
+				'label' => $term_data['label'],
+				'data' => $values,
+				'termId' => $term_id,
+				'borderColor' => $color,
+				'backgroundColor' => $color . '33',
+				'tension' => 0.4,
+			);
+		}
+
+		// Format dates for labels
+		$labels = array_map( function( $date ) {
+			list( $year, $month ) = explode( '-', $date );
+			return date_i18n( 'M Y', mktime( 0, 0, 0, (int) $month, 1, (int) $year ) );
+		}, $dates );
+
+		return array(
+			'labels' => $labels,
+			'datasets' => $datasets,
+		);
 	}
 
 	/**
@@ -873,11 +1164,6 @@ class Plugin {
 	public function filter_gatherpress_event_dates( string $where, \WP_Query $query ): string {
 		global $wpdb;
 
-		// // Only apply to queries with gatherpress_event_query parameter
-		// if ( ! isset( $query->query_vars['gatherpress_event_query'] ) ) {
-		// 	return $where;
-		// }
-
 		// Only apply if date_query is set
 		if ( empty( $query->query_vars['date_query'] ) ) {
 			return $where;
@@ -888,9 +1174,6 @@ class Plugin {
 		if ( 'gatherpress_event' !== $post_type && ! in_array( 'gatherpress_event', (array) $post_type, true ) ) {
 			return $where;
 		}
-// error_log( 'filter_gatherpress_event_dates applied' );
-// error_log( 'WHERE before: ' . $where );
-// error_log( 'query_vars: ' . var_export( $query->query_vars, true ) );
 
 		$date_query = $query->query_vars['date_query'];
 		if ( ! is_array( $date_query ) || empty( $date_query ) ) {
@@ -919,26 +1202,22 @@ class Plugin {
 		}
 
 		// Remove the WordPress post_date filtering that was added by date_query
-		// This regex removes the entire date_query WHERE clause
 		$where = preg_replace(
-			// '/AND\s+\(\s*\(\s*YEAR\([^)]+\)[^)]+\)\s*(?:AND\s*\(\s*MONTH\([^)]+\)[^)]+\)\s*)?\)/',
 			'/AND\s*\(\s*\(\s*YEAR\(\s*[^)]+\s*\)\s*=\s*\d+(?:\s+AND\s+MONTH\(\s*[^)]+\s*\)\s*=\s*\d+)?\s*\)\s*\)/',
 			'',
 			$where
 		);
 
-		// Add JOIN to gatherpress_events table (if not already present)
-		// Note: We can't add JOINs here, so we'll use a subquery approach instead
+		// Add our GatherPress event date filter using a subquery
 		$events_table = $wpdb->prefix . 'gatherpress_events';
 		$date_where = implode( ' AND ', $date_conditions );
 
-		// Add our GatherPress event date filter using a subquery
 		$where .= " AND {$wpdb->posts}.ID IN (
 			SELECT ge.post_id 
 			FROM {$events_table} ge 
 			WHERE {$date_where}
 		)";
-// error_log( 'WHERE after: ' . $where );
+
 		return $where;
 	}
 
@@ -1332,11 +1611,8 @@ class Plugin {
 				$args['tax_query'] = $tax_query;
 			}
 		}
-		// error_log( 'Count Events Args: ' . print_r( $args, true ) );
+		
 		$query = new \WP_Query( $args );
-		// error_log( 'Count Events Found Posts: ' . print_r( $query->found_posts, true ) );
-		// error_log( 'Count Events Found Posts: ' . var_export( $query, true ) );
-		// error_log( 'Found Posts: ' . var_export( wp_list_pluck( $query->posts, 'post_title'), true ) );
 		
 		return absint( $query->found_posts );
 	}
