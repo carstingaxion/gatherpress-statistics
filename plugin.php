@@ -23,6 +23,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 define( 'GATHERPRESS_STATISTICS_VERSION', '0.1.0' );
 define( 'GATHERPRESS_STATISTICS_CORE_PATH', __DIR__ );
 
+// ============================================================================
+// FILE: includes/core/class-plugin.php
+// ============================================================================
+
 /**
  * Main plugin class using singleton pattern.
  *
@@ -69,48 +73,66 @@ class Plugin {
 	 * @return void
 	 */
 	private function setup_hooks(): void {
-		add_action( 'registered_post_type_gatherpress_event', array( $this, 'register_post_type_support' ) );
-		add_action( 'init', array( $this, 'block_init' ) );
-		add_action( 'init', array( $this, 'create_archive_table' ) );
-		add_action( 'rest_api_init', array( $this, 'register_rest_routes' ) );
-		add_action( 'admin_menu', array( $this, 'register_admin_page' ) );
-		add_action( 'admin_init', array( $this, 'handle_manual_archive_generation' ) );
-		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_assets' ) );
-		add_action( 'gatherpress_statistics_regenerate_cache', array( $this, 'pregenerate_cache' ) );
-		add_action( 'gatherpress_statistics_monthly_archive', array( $this, 'archive_monthly_statistics' ) );
-		add_action( 'transition_post_status', array( $this, 'clear_cache_on_status_change' ), 10, 3 );
-		add_action( 'updated_post_meta', array( $this, 'clear_cache_on_meta_update' ), 10, 3 );
-		add_action( 'added_post_meta', array( $this, 'clear_cache_on_meta_update' ), 10, 3 );
-		add_action( 'deleted_post_meta', array( $this, 'clear_cache_on_meta_delete' ), 10, 3 );
-		add_action( 'create_term', array( $this, 'clear_cache_on_term_change' ), 10, 3 );
-		add_action( 'edit_term', array( $this, 'clear_cache_on_term_change' ), 10, 3 );
-		add_action( 'delete_term', array( $this, 'clear_cache_on_term_change' ), 10, 3 );
-		add_action( 'set_object_terms', array( $this, 'clear_cache_on_term_relationship' ), 10, 3 );
-		add_filter( 'posts_where', array( $this, 'filter_gatherpress_event_dates' ), 10, 2 );
+		add_action( 'registered_post_type_gatherpress_event', array( Setup::get_instance(), 'register_post_type_support' ) );
+		add_action( 'init', array( Setup::get_instance(), 'block_init' ) );
+		add_action( 'init', array( Database::get_instance(), 'create_archive_table' ) );
+		add_action( 'rest_api_init', array( RestApi::get_instance(), 'register_rest_routes' ) );
+		add_action( 'admin_menu', array( AdminPage::get_instance(), 'register_admin_page' ) );
+		add_action( 'admin_init', array( AdminPage::get_instance(), 'handle_manual_archive_generation' ) );
+		add_action( 'admin_enqueue_scripts', array( AdminPage::get_instance(), 'enqueue_admin_assets' ) );
+		add_action( 'gatherpress_statistics_regenerate_cache', array( Cache::get_instance(), 'pregenerate_cache' ) );
+		add_action( 'gatherpress_statistics_monthly_archive', array( Archive::get_instance(), 'archive_monthly_statistics' ) );
+		add_action( 'transition_post_status', array( CacheInvalidation::get_instance(), 'clear_cache_on_status_change' ), 10, 3 );
+		add_action( 'updated_post_meta', array( CacheInvalidation::get_instance(), 'clear_cache_on_meta_update' ), 10, 3 );
+		add_action( 'added_post_meta', array( CacheInvalidation::get_instance(), 'clear_cache_on_meta_update' ), 10, 3 );
+		add_action( 'deleted_post_meta', array( CacheInvalidation::get_instance(), 'clear_cache_on_meta_delete' ), 10, 3 );
+		add_action( 'create_term', array( CacheInvalidation::get_instance(), 'clear_cache_on_term_change' ), 10, 3 );
+		add_action( 'edit_term', array( CacheInvalidation::get_instance(), 'clear_cache_on_term_change' ), 10, 3 );
+		add_action( 'delete_term', array( CacheInvalidation::get_instance(), 'clear_cache_on_term_change' ), 10, 3 );
+		add_action( 'set_object_terms', array( CacheInvalidation::get_instance(), 'clear_cache_on_term_relationship' ), 10, 3 );
+		add_filter( 'posts_where', array( QueryFilters::get_instance(), 'filter_gatherpress_event_dates' ), 10, 2 );
 	}
+}
+
+// ============================================================================
+// FILE: includes/core/class-setup.php
+// ============================================================================
+
+/**
+ * Setup class for plugin initialization.
+ *
+ * @since 0.1.0
+ */
+class Setup {
+	/**
+	 * Class instance.
+	 *
+	 * @since 0.1.0
+	 * @var Setup|null
+	 */
+	private static $instance = null;
 
 	/**
-	 * Enqueue admin assets.
+	 * Get class instance.
 	 *
 	 * @since 0.1.0
 	 *
-	 * @param string $hook Current admin page hook.
-	 * @return void
+	 * @return Setup
 	 */
-	public function enqueue_admin_assets( string $hook ): void {
-		if ( 'dashboard_page_gatherpress-statistics-archive' !== $hook ) {
-			return;
+	public static function get_instance(): Setup {
+		if ( null === self::$instance ) {
+			self::$instance = new self();
 		}
 
-		// Enqueue Chart.js from CDN
-		wp_enqueue_script(
-			'chartjs',
-			'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js',
-			array(),
-			'4.4.1',
-			true
-		);
+		return self::$instance;
 	}
+
+	/**
+	 * Constructor.
+	 *
+	 * @since 0.1.0
+	 */
+	private function __construct() {}
 
 	/**
 	 * Register post type support for gatherpress_statistics.
@@ -133,6 +155,58 @@ class Plugin {
 		
 		add_post_type_support( 'gatherpress_event', 'gatherpress_statistics', $config );
 	}
+
+	/**
+	 * Registers the block.
+	 *
+	 * @since 0.1.0
+	 *
+	 * @return void
+	 */
+	public function block_init(): void {
+		register_block_type( __DIR__ . '/build/' );
+	}
+}
+
+// ============================================================================
+// FILE: includes/core/class-database.php
+// ============================================================================
+
+/**
+ * Database operations class.
+ *
+ * @since 0.1.0
+ */
+class Database {
+	/**
+	 * Class instance.
+	 *
+	 * @since 0.1.0
+	 * @var Database|null
+	 */
+	private static $instance = null;
+
+	/**
+	 * Get class instance.
+	 *
+	 * @since 0.1.0
+	 *
+	 * @return Database
+	 */
+	public static function get_instance(): Database {
+		if ( null === self::$instance ) {
+			self::$instance = new self();
+		}
+
+		return self::$instance;
+	}
+
+	/**
+	 * Constructor.
+	 *
+	 * @since 0.1.0
+	 */
+	private function __construct() {}
 
 	/**
 	 * Create database table for archival statistics.
@@ -167,16 +241,1517 @@ class Plugin {
 		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 		dbDelta( $sql );
 	}
+}
+
+// ============================================================================
+// FILE: includes/core/class-support.php
+// ============================================================================
+
+/**
+ * Post type support management class.
+ *
+ * @since 0.1.0
+ */
+class Support {
+	/**
+	 * Class instance.
+	 *
+	 * @since 0.1.0
+	 * @var Support|null
+	 */
+	private static $instance = null;
 
 	/**
-	 * Registers the block.
+	 * Get class instance.
+	 *
+	 * @since 0.1.0
+	 *
+	 * @return Support
+	 */
+	public static function get_instance(): Support {
+		if ( null === self::$instance ) {
+			self::$instance = new self();
+		}
+
+		return self::$instance;
+	}
+
+	/**
+	 * Constructor.
+	 *
+	 * @since 0.1.0
+	 */
+	private function __construct() {}
+
+	/**
+	 * Get the statistics support configuration for a post type.
+	 *
+	 * @since 0.1.0
+	 *
+	 * @param string $post_type Post type slug.
+	 * @return array<string, bool> Configuration array.
+	 */
+	public function get_support_config( string $post_type = 'gatherpress_event' ): array {
+		if ( ! post_type_supports( $post_type, 'gatherpress_statistics' ) ) {
+			return array();
+		}
+		
+		$supports = get_all_post_type_supports( $post_type );
+		
+		if ( isset( $supports['gatherpress_statistics'] ) && is_array( $supports['gatherpress_statistics'] ) ) {
+			return reset( $supports['gatherpress_statistics'] );
+		}
+		
+		return array(
+			'total_events'                => true,
+			'events_per_taxonomy'         => true,
+			'events_multi_taxonomy'       => true,
+			'total_taxonomy_terms'        => true,
+			'taxonomy_terms_by_taxonomy'  => true,
+			'total_attendees'             => true,
+		);
+	}
+
+	/**
+	 * Check if a specific statistic type is supported.
+	 *
+	 * @since 0.1.0
+	 *
+	 * @param string $statistic_type The statistic type to check.
+	 * @param string $post_type      Optional. Post type to check.
+	 * @return bool True if supported.
+	 */
+	public function is_statistic_type_supported( string $statistic_type, string $post_type = 'gatherpress_event' ): bool {
+		$config = $this->get_support_config( $post_type );
+		
+		if ( empty( $config ) ) {
+			return false;
+		}
+		
+		return ! empty( $config[ $statistic_type ] );
+	}
+
+	/**
+	 * Get all supported statistic types for a post type.
+	 *
+	 * @since 0.1.0
+	 *
+	 * @param string $post_type Optional. Post type to check.
+	 * @return array<int, string> Array of supported statistic type slugs.
+	 */
+	public function get_supported_statistic_types( string $post_type = 'gatherpress_event' ): array {
+		$config = $this->get_support_config( $post_type );
+		
+		if ( empty( $config ) ) {
+			return array();
+		}
+		
+		$enabled_types = array();
+		foreach ( $config as $type => $enabled ) {
+			if ( $enabled ) {
+				$enabled_types[] = $type;
+			}
+		}
+		
+		return $enabled_types;
+	}
+
+	/**
+	 * Get all post types that support gatherpress_statistics.
+	 *
+	 * @since 0.1.0
+	 *
+	 * @return array<int, string> Array of post type slugs.
+	 */
+	public function get_supported_post_types(): array {
+		$post_types = get_post_types_by_support( 'gatherpress_statistics' );
+		
+		if ( empty( $post_types ) || ! is_array( $post_types ) ) {
+			return array();
+		}
+		
+		return $post_types;
+	}
+
+	/**
+	 * Check if any post types support gatherpress_statistics.
+	 *
+	 * @since 0.1.0
+	 *
+	 * @return bool True if at least one post type supports statistics.
+	 */
+	public function has_supported_post_types(): bool {
+		$post_types = $this->get_supported_post_types();
+		return ! empty( $post_types );
+	}
+
+	/**
+	 * Check if a specific post is supported for statistics.
+	 *
+	 * @since 0.1.0
+	 *
+	 * @param int $post_id Post ID to check.
+	 * @return bool True if supported.
+	 */
+	public function is_supported_post( int $post_id ) : bool {
+		$post = get_post( $post_id );
+		
+		return post_type_supports( $post->post_type, 'gatherpress_statistics' ) 
+			&& $post->post_status === 'publish';
+	}
+}
+
+// ============================================================================
+// FILE: includes/core/class-taxonomy.php
+// ============================================================================
+
+/**
+ * Taxonomy management class.
+ *
+ * @since 0.1.0
+ */
+class Taxonomy {
+	/**
+	 * Class instance.
+	 *
+	 * @since 0.1.0
+	 * @var Taxonomy|null
+	 */
+	private static $instance = null;
+
+	/**
+	 * Get class instance.
+	 *
+	 * @since 0.1.0
+	 *
+	 * @return Taxonomy
+	 */
+	public static function get_instance(): Taxonomy {
+		if ( null === self::$instance ) {
+			self::$instance = new self();
+		}
+
+		return self::$instance;
+	}
+
+	/**
+	 * Constructor.
+	 *
+	 * @since 0.1.0
+	 */
+	private function __construct() {}
+
+	/**
+	 * Get all taxonomies registered for supported post types.
+	 *
+	 * @since 0.1.0
+	 *
+	 * @return array<int, \WP_Taxonomy> Array of taxonomy objects.
+	 */
+	public function get_taxonomies(): array {
+		$post_types = Support::get_instance()->get_supported_post_types();
+		
+		if ( empty( $post_types ) ) {
+			return array();
+		}
+		
+		$all_taxonomies = array();
+		
+		foreach ( $post_types as $post_type ) {
+			if ( ! post_type_exists( $post_type ) ) {
+				continue;
+			}
+			
+			$taxonomies = \get_object_taxonomies( $post_type, 'objects' );
+			
+			if ( ! empty( $taxonomies ) && is_array( $taxonomies ) ) {
+				foreach ( $taxonomies as $taxonomy ) {
+					if ( isset( $taxonomy->name ) ) {
+						$all_taxonomies[ $taxonomy->name ] = $taxonomy;
+					}
+				}
+			}
+		}
+		
+		return array_values( $all_taxonomies );
+	}
+
+	/**
+	 * Get filtered taxonomies.
+	 *
+	 * @since 0.1.0
+	 *
+	 * @param bool $for_editor Optional. Whether this is for editor selection.
+	 * @return array<int, \WP_Taxonomy> Array of taxonomy objects.
+	 */
+	public function get_filtered_taxonomies( bool $for_editor = false ): array {
+		$taxonomies = $this->get_taxonomies();
+		
+		if ( empty( $taxonomies ) || ! is_array( $taxonomies ) ) {
+			return array();
+		}
+		
+		$excluded_taxonomies = apply_filters(
+			'gatherpress_statistics_excluded_taxonomies',
+			array( '_gatherpress_venue' ),
+			$for_editor
+		);
+		
+		if ( ! is_array( $excluded_taxonomies ) ) {
+			$excluded_taxonomies = array();
+		}
+		
+		$filtered_taxonomies = array();
+		foreach ( $taxonomies as $taxonomy ) {
+			if ( ! isset( $taxonomy->name ) ) {
+				continue;
+			}
+			
+			if ( in_array( $taxonomy->name, $excluded_taxonomies, true ) ) {
+				continue;
+			}
+			
+			$filtered_taxonomies[] = $taxonomy;
+		}
+		
+		return $filtered_taxonomies;
+	}
+}
+
+// ============================================================================
+// FILE: includes/core/class-cache.php
+// ============================================================================
+
+/**
+ * Cache management class.
+ *
+ * @since 0.1.0
+ */
+class Cache {
+	/**
+	 * Class instance.
+	 *
+	 * @since 0.1.0
+	 * @var Cache|null
+	 */
+	private static $instance = null;
+
+	/**
+	 * Get class instance.
+	 *
+	 * @since 0.1.0
+	 *
+	 * @return Cache
+	 */
+	public static function get_instance(): Cache {
+		if ( null === self::$instance ) {
+			self::$instance = new self();
+		}
+
+		return self::$instance;
+	}
+
+	/**
+	 * Constructor.
+	 *
+	 * @since 0.1.0
+	 */
+	private function __construct() {}
+
+	/**
+	 * Get cache key for a specific statistic configuration.
+	 *
+	 * @since 0.1.0
+	 *
+	 * @param string               $statistic_type The type of statistic.
+	 * @param array<string, mixed> $filters        Additional filters.
+	 * @return string Cache key.
+	 */
+	public function get_cache_key( string $statistic_type, array $filters = array() ): string {
+		$statistic_type = is_string( $statistic_type ) ? $statistic_type : 'total_events';
+		$filters = is_array( $filters ) ? $filters : array();
+		
+		$key_parts = array( 'gatherpress_stats', $statistic_type );
+		
+		if ( ! empty( $filters['event_query'] ) && in_array( $filters['event_query'], array( 'upcoming', 'past' ), true ) ) {
+			$key_parts[] = sanitize_key( $filters['event_query'] );
+		}
+		
+		if ( ! empty( $filters ) ) {
+			$key_parts[] = md5( wp_json_encode( $filters ) );
+		}
+		
+		return implode( '_', $key_parts );
+	}
+
+	/**
+	 * Get cache expiration time in seconds.
+	 *
+	 * @since 0.1.0
+	 *
+	 * @return int Cache expiration time in seconds.
+	 */
+	public function get_cache_expiration(): int {
+		$expiration = apply_filters(
+			'gatherpress_statistics_cache_expiration',
+			12 * HOUR_IN_SECONDS
+		);
+		
+		if ( ! is_numeric( $expiration ) || $expiration < 1 ) {
+			$expiration = 12 * HOUR_IN_SECONDS;
+		}
+		
+		return absint( $expiration );
+	}
+
+	/**
+	 * Get statistic with caching.
+	 *
+	 * @since 0.1.0
+	 *
+	 * @param string               $statistic_type Statistic type to retrieve.
+	 * @param array<string, mixed> $filters        Filters to apply.
+	 * @return int Statistic value.
+	 */
+	public function get_cached( string $statistic_type, array $filters = array() ): int {
+		if ( ! is_string( $statistic_type ) || empty( $statistic_type ) ) {
+			return 0;
+		}
+		
+		if ( ! is_array( $filters ) ) {
+			$filters = array();
+		}
+		
+		if ( ! Support::get_instance()->has_supported_post_types() ) {
+			return 0;
+		}
+		
+		if ( ! Support::get_instance()->is_statistic_type_supported( $statistic_type ) ) {
+			return 0;
+		}
+
+		$expiration = $this->get_cache_expiration();
+
+		$cache_key = $this->get_cache_key( $statistic_type, $filters );
+		
+		$cached = get_transient( $cache_key );
+		
+		if ( false !== $cached && is_numeric( $cached ) ) {
+			return absint( $cached );
+		}
+		
+		$value = Statistics::get_instance()->calculate( $statistic_type, $filters );
+		
+		$value = is_numeric( $value ) ? absint( $value ) : 0;
+		
+		\set_transient( $cache_key, $value, $expiration );
+		
+		return $value;
+	}
+
+	/**
+	 * Get all common statistic configurations to pre-generate.
+	 *
+	 * @since 0.1.0
+	 *
+	 * @return array<int, array{type: string, filters: array<string, mixed>}> Array of configurations.
+	 */
+	public function get_common_configs(): array {
+		$configs = array();
+		
+		$supported_types = Support::get_instance()->get_supported_statistic_types();
+		
+		if ( empty( $supported_types ) ) {
+			return array();
+		}
+		
+		$event_queries = array( 'upcoming', 'past' );
+		
+		foreach ( $event_queries as $event_query ) {
+			if ( in_array( 'total_events', $supported_types, true ) ) {
+				$configs[] = array(
+					'type'    => 'total_events',
+					'filters' => array( 'event_query' => $event_query ),
+				);
+			}
+		}
+		
+		if ( in_array( 'total_attendees', $supported_types, true ) ) {
+			$configs[] = array(
+				'type'    => 'total_attendees',
+				'filters' => array( 'event_query' => 'past' ),
+			);
+		}
+		
+		$taxonomies = Taxonomy::get_instance()->get_filtered_taxonomies();
+		
+		if ( empty( $taxonomies ) || ! is_array( $taxonomies ) ) {
+			return $configs;
+		}
+		
+		foreach ( $taxonomies as $taxonomy ) {
+			if ( ! isset( $taxonomy->name ) ) {
+				continue;
+			}
+			
+			if ( in_array( 'total_taxonomy_terms', $supported_types, true ) ) {
+				$configs[] = array(
+					'type'    => 'total_taxonomy_terms',
+					'filters' => array( 'taxonomy' => $taxonomy->name ),
+				);
+			}
+			
+			$terms = \get_terms(
+				array(
+					'taxonomy'   => $taxonomy->name,
+					'hide_empty' => false,
+				)
+			);
+			
+			if ( ! is_wp_error( $terms ) && is_array( $terms ) && ! empty( $terms ) ) {
+				foreach ( $terms as $term ) {
+					if ( ! isset( $term->term_id ) ) {
+						continue;
+					}
+					
+					foreach ( $event_queries as $event_query ) {
+						$filters = array(
+							'taxonomy'    => $taxonomy->name,
+							'term_id'     => $term->term_id,
+							'event_query' => $event_query,
+						);
+						
+						if ( in_array( 'events_per_taxonomy', $supported_types, true ) ) {
+							$configs[] = array(
+								'type'    => 'events_per_taxonomy',
+								'filters' => $filters,
+							);
+						}
+					}
+					
+					if ( in_array( 'total_attendees', $supported_types, true ) ) {
+						$configs[] = array(
+							'type'    => 'total_attendees',
+							'filters' => array(
+								'taxonomy'    => $taxonomy->name,
+								'term_id'     => $term->term_id,
+								'event_query' => 'past',
+							),
+						);
+					}
+				}
+			}
+		}
+		
+		if ( in_array( 'taxonomy_terms_by_taxonomy', $supported_types, true ) 
+			&& is_array( $taxonomies ) 
+			&& count( $taxonomies ) > 1 ) {
+			$taxonomy_array = array_values( $taxonomies );
+			
+			for ( $i = 0; $i < count( $taxonomy_array ); $i++ ) {
+				for ( $j = 0; $j < count( $taxonomy_array ); $j++ ) {
+					if ( $i !== $j ) {
+						$filter_tax = $taxonomy_array[ $i ];
+						$count_tax  = $taxonomy_array[ $j ];
+						
+						if ( ! isset( $filter_tax->name ) || ! isset( $count_tax->name ) ) {
+							continue;
+						}
+						
+						$terms = \get_terms(
+							array(
+								'taxonomy'   => $filter_tax->name,
+								'hide_empty' => false,
+								'number'     => 10,
+							)
+						);
+						
+						if ( ! is_wp_error( $terms ) && is_array( $terms ) && ! empty( $terms ) ) {
+							foreach ( $terms as $term ) {
+								if ( ! isset( $term->term_id ) ) {
+									continue;
+								}
+								
+								$configs[] = array(
+									'type'    => 'taxonomy_terms_by_taxonomy',
+									'filters' => array(
+										'count_taxonomy'  => $count_tax->name,
+										'filter_taxonomy' => $filter_tax->name,
+										'term_id'         => $term->term_id,
+									),
+								);
+							}
+						}
+					}
+				}
+			}
+		}
+		
+		return $configs;
+	}
+
+	/**
+	 * Pre-generate common statistics after cache clear.
 	 *
 	 * @since 0.1.0
 	 *
 	 * @return void
 	 */
-	public function block_init(): void {
-		register_block_type( __DIR__ . '/build/' );
+	public function pregenerate_cache(): void {
+		if ( ! Support::get_instance()->has_supported_post_types() ) {
+			return;
+		}
+		
+		$configs = $this->get_common_configs();
+		
+		if ( ! is_array( $configs ) ) {
+			return;
+		}
+
+		$expiration = $this->get_cache_expiration();
+
+		foreach ( $configs as $config ) {
+			if ( ! isset( $config['type'] ) || ! isset( $config['filters'] ) ) {
+				continue;
+			}
+			
+			$cache_key = $this->get_cache_key(
+				$config['type'],
+				$config['filters']
+			);
+			
+			$value = Statistics::get_instance()->calculate(
+				$config['type'],
+				$config['filters']
+			);
+			
+			$value = is_numeric( $value ) ? absint( $value ) : 0;
+			
+			\set_transient( $cache_key, $value, $expiration );
+		}
+	}
+
+	/**
+	 * Clear all statistics caches and schedule regeneration.
+	 *
+	 * @since 0.1.0
+	 *
+	 * @global \wpdb $wpdb WordPress database abstraction object.
+	 * @return void
+	 */
+	public function clear_cache(): void {
+		global $wpdb;
+		
+		$wpdb->query(
+			"DELETE FROM {$wpdb->options} 
+			WHERE option_name LIKE '_transient_gatherpress_stats_%' 
+			OR option_name LIKE '_transient_timeout_gatherpress_stats_%'"
+		);
+		
+		$scheduled = wp_next_scheduled( 'gatherpress_statistics_regenerate_cache' );
+		
+		if ( ! $scheduled ) {
+			wp_schedule_single_event(
+				time() + 60,
+				'gatherpress_statistics_regenerate_cache'
+			);
+		}
+	}
+}
+
+// ============================================================================
+// FILE: includes/core/class-statistics.php
+// ============================================================================
+
+/**
+ * Statistics calculation class.
+ *
+ * @since 0.1.0
+ */
+class Statistics {
+	/**
+	 * Class instance.
+	 *
+	 * @since 0.1.0
+	 * @var Statistics|null
+	 */
+	private static $instance = null;
+
+	/**
+	 * Get class instance.
+	 *
+	 * @since 0.1.0
+	 *
+	 * @return Statistics
+	 */
+	public static function get_instance(): Statistics {
+		if ( null === self::$instance ) {
+			self::$instance = new self();
+		}
+
+		return self::$instance;
+	}
+
+	/**
+	 * Constructor.
+	 *
+	 * @since 0.1.0
+	 */
+	private function __construct() {}
+
+	/**
+	 * Calculate statistics based on type and filters.
+	 *
+	 * @since 0.1.0
+	 *
+	 * @param string               $statistic_type The type of statistic to calculate.
+	 * @param array<string, mixed> $filters        Filters to apply.
+	 * @return int Calculated statistic value.
+	 */
+	public function calculate( string $statistic_type, array $filters = array() ): int {
+		if ( ! Support::get_instance()->has_supported_post_types() ) {
+			return 0;
+		}
+		
+		if ( ! Support::get_instance()->is_statistic_type_supported( $statistic_type ) ) {
+			return 0;
+		}
+
+		$statistic_type = is_string( $statistic_type ) ? $statistic_type : 'total_events';
+		$filters = is_array( $filters ) ? $filters : array();
+		
+		if ( empty( $filters['event_query'] ) || ! in_array( $filters['event_query'], array( 'upcoming', 'past' ), true ) ) {
+			return 0;
+		}
+		
+		$result = 0;
+		
+		switch ( $statistic_type ) {
+			case 'total_events':
+				$result = Query::get_instance()->count_events( $filters );
+				break;
+				
+			case 'events_per_taxonomy':
+				$result = Query::get_instance()->count_events( $filters );
+				break;
+				
+			case 'events_multi_taxonomy':
+				$result = Query::get_instance()->count_events( $filters );
+				break;
+				
+			case 'total_taxonomy_terms':
+				$result = Query::get_instance()->count_terms( $filters );
+				break;
+				
+			case 'taxonomy_terms_by_taxonomy':
+				$result = Query::get_instance()->terms_by_taxonomy( $filters );
+				break;
+				
+			case 'total_attendees':
+				$result = Query::get_instance()->count_attendees( $filters );
+				break;
+		}
+		
+		$result = is_numeric( $result ) ? absint( $result ) : 0;
+		
+		return apply_filters( 'gatherpress_stats_calculate_' . $statistic_type, $result, $filters );
+	}
+}
+
+// ============================================================================
+// FILE: includes/core/class-query.php
+// ============================================================================
+
+/**
+ * Query class for database operations.
+ *
+ * @since 0.1.0
+ */
+class Query {
+	/**
+	 * Class instance.
+	 *
+	 * @since 0.1.0
+	 * @var Query|null
+	 */
+	private static $instance = null;
+
+	/**
+	 * Get class instance.
+	 *
+	 * @since 0.1.0
+	 *
+	 * @return Query
+	 */
+	public static function get_instance(): Query {
+		if ( null === self::$instance ) {
+			self::$instance = new self();
+		}
+
+		return self::$instance;
+	}
+
+	/**
+	 * Constructor.
+	 *
+	 * @since 0.1.0
+	 */
+	private function __construct() {}
+
+	/**
+	 * Build date query arguments from filters.
+	 *
+	 * @since 0.1.0
+	 *
+	 * @param array<string, mixed> $filters Query filters.
+	 * @return array<string, mixed> Date query arguments.
+	 */
+	private function build_date_query( array $filters ): array {
+		$date_query = array();
+		
+		if ( ! empty( $filters['year'] ) ) {
+			$year = absint( $filters['year'] );
+			if ( $year > 0 ) {
+				$date_query['year'] = $year;
+			}
+		}
+		
+		if ( ! empty( $filters['month'] ) ) {
+			$month = absint( $filters['month'] );
+			if ( $month >= 1 && $month <= 12 ) {
+				$date_query['month'] = $month;
+			}
+		}
+		
+		return $date_query;
+	}
+
+	/**
+	 * Count events with filters.
+	 *
+	 * @since 0.1.0
+	 *
+	 * @param array<string, mixed> $filters Query filters.
+	 * @return int Number of events.
+	 */
+	public function count_events( array $filters = array() ): int {
+		$post_types = Support::get_instance()->get_supported_post_types();
+		
+		if ( empty( $post_types ) ) {
+			return 0;
+		}
+		
+		$filters = is_array( $filters ) ? $filters : array();
+		
+		$args = array(
+			'post_type'      => $post_types,
+			'post_status'    => 'publish',
+			'posts_per_page' => -1,
+			'fields'         => 'ids',
+		);
+		
+		if ( isset( $filters['event_query'] ) && is_string( $filters['event_query'] ) ) {
+			$event_query = sanitize_key( $filters['event_query'] );
+			if ( in_array( $event_query, array( 'upcoming', 'past' ), true ) ) {
+				$args['gatherpress_event_query'] = $event_query;
+			}
+		}
+		
+		$date_query = $this->build_date_query( $filters );
+		if ( ! empty( $date_query ) ) {
+			$args['date_query'] = array( $date_query );
+		}
+		
+		if ( ! empty( $filters['taxonomy'] ) && ! empty( $filters['term_id'] ) ) {
+			if ( taxonomy_exists( $filters['taxonomy'] ) ) {
+				$args['tax_query'] = array(
+					array(
+						'taxonomy' => sanitize_key( $filters['taxonomy'] ),
+						'field'    => 'term_id',
+						'terms'    => absint( $filters['term_id'] ),
+					),
+				);
+			}
+		}
+		else if ( ! empty( $filters['taxonomy_terms'] ) && is_array( $filters['taxonomy_terms'] ) ) {
+			$tax_query = array( 'relation' => 'AND' );
+			
+			foreach ( $filters['taxonomy_terms'] as $taxonomy => $term_ids ) {
+				if ( ! empty( $term_ids ) && is_array( $term_ids ) && taxonomy_exists( $taxonomy ) ) {
+					$tax_query[] = array(
+						'taxonomy' => sanitize_key( $taxonomy ),
+						'field'    => 'term_id',
+						'terms'    => array_map( 'absint', $term_ids ),
+					);
+				}
+			}
+			
+			if ( count( $tax_query ) > 1 ) {
+				$args['tax_query'] = $tax_query;
+			}
+		}
+		
+		$query = new \WP_Query( $args );
+		
+		return absint( $query->found_posts );
+	}
+
+	/**
+	 * Count total terms in a taxonomy.
+	 *
+	 * @since 0.1.0
+	 *
+	 * @param array<string, mixed> $filters Filters including taxonomy.
+	 * @return int Number of terms.
+	 */
+	public function count_terms( array $filters = array() ): int {
+		$post_types = Support::get_instance()->get_supported_post_types();
+		
+		if ( empty( $post_types ) ) {
+			return 0;
+		}
+		
+		$filters = is_array( $filters ) ? $filters : array();
+		$taxonomy = isset( $filters['taxonomy'] ) && is_string( $filters['taxonomy'] ) ? $filters['taxonomy'] : '';
+		
+		if ( empty( $taxonomy ) || ! taxonomy_exists( $taxonomy ) ) {
+			return 0;
+		}
+		
+		$args = array(
+			'taxonomy'   => sanitize_key( $taxonomy ),
+			'hide_empty' => true,
+			'object_ids' => null,
+		);
+		
+		$query_args = array(
+			'post_type'      => $post_types,
+			'post_status'    => 'publish',
+			'posts_per_page' => -1,
+			'fields'         => 'ids',
+		);
+		
+		$date_query = $this->build_date_query( $filters );
+		if ( ! empty( $date_query ) ) {
+			$query_args['date_query'] = array( $date_query );
+		}
+		
+		$post_query = new \WP_Query( $query_args );
+		
+		if ( ! empty( $post_query->posts ) ) {
+			$args['object_ids'] = $post_query->posts;
+		}
+		
+		$terms = \get_terms( $args );
+		
+		if ( is_wp_error( $terms ) || ! is_array( $terms ) ) {
+			return 0;
+		}
+		
+		return absint( count( $terms ) );
+	}
+
+	/**
+	 * Count terms of one taxonomy that have events in another taxonomy.
+	 *
+	 * @since 0.1.0
+	 *
+	 * @param array<string, mixed> $filters Filters for cross-taxonomy counting.
+	 * @return int Number of unique terms.
+	 */
+	public function terms_by_taxonomy( array $filters = array() ): int {
+		$post_types = Support::get_instance()->get_supported_post_types();
+		
+		if ( empty( $post_types ) ) {
+			return 0;
+		}
+		
+		$filters = is_array( $filters ) ? $filters : array();
+		
+		$count_taxonomy  = isset( $filters['count_taxonomy'] ) && is_string( $filters['count_taxonomy'] ) ? $filters['count_taxonomy'] : '';
+		$filter_taxonomy = isset( $filters['filter_taxonomy'] ) && is_string( $filters['filter_taxonomy'] ) ? $filters['filter_taxonomy'] : '';
+		$term_id         = isset( $filters['term_id'] ) ? absint( $filters['term_id'] ) : 0;
+		
+		if ( empty( $count_taxonomy ) || empty( $filter_taxonomy ) || $term_id === 0 ) {
+			return 0;
+		}
+		
+		if ( ! taxonomy_exists( $count_taxonomy ) || ! taxonomy_exists( $filter_taxonomy ) ) {
+			return 0;
+		}
+		
+		$args = array(
+			'post_type'      => $post_types,
+			'post_status'    => 'publish',
+			'posts_per_page' => -1,
+			'fields'         => 'ids',
+			'tax_query'      => array(
+				array(
+					'taxonomy' => sanitize_key( $filter_taxonomy ),
+					'field'    => 'term_id',
+					'terms'    => $term_id,
+				),
+			),
+		);
+		
+		$date_query = $this->build_date_query( $filters );
+		if ( ! empty( $date_query ) ) {
+			$args['date_query'] = array( $date_query );
+		}
+		
+		$query = new \WP_Query( $args );
+		$terms = array();
+		
+		if ( is_array( $query->posts ) ) {
+			foreach ( $query->posts as $post_id ) {
+				$post_terms = wp_get_post_terms( $post_id, sanitize_key( $count_taxonomy ), array( 'fields' => 'ids' ) );
+				
+				if ( ! is_wp_error( $post_terms ) && is_array( $post_terms ) && ! empty( $post_terms ) ) {
+					$terms = array_merge( $terms, $post_terms );
+				}
+			}
+		}
+		
+		return absint( count( array_unique( $terms ) ) );
+	}
+
+	/**
+	 * Count total attendees with filters.
+	 *
+	 * @since 0.1.0
+	 *
+	 * @param array<string, mixed> $filters Query filters.
+	 * @return int Total number of attendees.
+	 */
+	public function count_attendees( array $filters = array() ): int {
+		$post_types = Support::get_instance()->get_supported_post_types();
+		
+		if ( empty( $post_types ) ) {
+			return 0;
+		}
+		$filters = is_array( $filters ) ? $filters : array();
+		
+		$args = array(
+			'post_type'      => $post_types,
+			'post_status'    => 'publish',
+			'posts_per_page' => -1,
+			'fields'         => 'ids',
+		);
+		
+		if ( isset( $filters['event_query'] ) && is_string( $filters['event_query'] ) ) {
+			$event_query = sanitize_key( $filters['event_query'] );
+			if ( in_array( $event_query, array( 'upcoming', 'past' ), true ) ) {
+				$args['gatherpress_event_query'] = $event_query;
+			}
+		}
+		
+		$date_query = $this->build_date_query( $filters );
+		if ( ! empty( $date_query ) ) {
+			$args['date_query'] = array( $date_query );
+		}
+		
+		if ( ! empty( $filters['taxonomy'] ) && ! empty( $filters['term_id'] ) ) {
+			if ( taxonomy_exists( $filters['taxonomy'] ) ) {
+				$args['tax_query'] = array(
+					array(
+						'taxonomy' => sanitize_key( $filters['taxonomy'] ),
+						'field'    => 'term_id',
+						'terms'    => absint( $filters['term_id'] ),
+					),
+				);
+			}
+		}
+		else if ( ! empty( $filters['taxonomy_terms'] ) && is_array( $filters['taxonomy_terms'] ) ) {
+			$tax_query = array( 'relation' => 'AND' );
+			
+			foreach ( $filters['taxonomy_terms'] as $taxonomy => $term_ids ) {
+				if ( ! empty( $term_ids ) && is_array( $term_ids ) && taxonomy_exists( $taxonomy ) ) {
+					$tax_query[] = array(
+						'taxonomy' => sanitize_key( $taxonomy ),
+						'field'    => 'term_id',
+						'terms'    => array_map( 'absint', $term_ids ),
+					);
+				}
+			}
+			
+			if ( count( $tax_query ) > 1 ) {
+				$args['tax_query'] = $tax_query;
+			}
+		}
+		
+		$query = new \WP_Query( $args );
+		$total_attendees = 0;
+		
+		if ( is_array( $query->posts ) && ! empty( $query->posts ) ) {
+			foreach ( $query->posts as $post_id ) {
+				$attendee_count = (int) get_post_meta( $post_id, 'gatherpress_attendee_count', true );
+				
+				if ( is_numeric( $attendee_count ) ) {
+					$total_attendees += absint( $attendee_count );
+				}
+			}
+		}
+		
+		return absint( $total_attendees );
+	}
+}
+
+// ============================================================================
+// FILE: includes/core/class-query-filters.php
+// ============================================================================
+
+/**
+ * Query filters class for modifying SQL queries.
+ *
+ * @since 0.1.0
+ */
+class QueryFilters {
+	/**
+	 * Class instance.
+	 *
+	 * @since 0.1.0
+	 * @var QueryFilters|null
+	 */
+	private static $instance = null;
+
+	/**
+	 * Get class instance.
+	 *
+	 * @since 0.1.0
+	 *
+	 * @return QueryFilters
+	 */
+	public static function get_instance(): QueryFilters {
+		if ( null === self::$instance ) {
+			self::$instance = new self();
+		}
+
+		return self::$instance;
+	}
+
+	/**
+	 * Constructor.
+	 *
+	 * @since 0.1.0
+	 */
+	private function __construct() {}
+
+	/**
+	 * Filter SQL WHERE clause to use GatherPress event dates instead of post dates.
+	 *
+	 * @since 0.1.0
+	 *
+	 * @global \wpdb $wpdb WordPress database abstraction object.
+	 * @param string    $where The WHERE clause of the query.
+	 * @param \WP_Query $query The WP_Query instance.
+	 * @return string Modified WHERE clause.
+	 */
+	public function filter_gatherpress_event_dates( string $where, \WP_Query $query ): string {
+		global $wpdb;
+
+		if ( empty( $query->query_vars['date_query'] ) ) {
+			return $where;
+		}
+
+		$post_type = $query->get( 'post_type' );
+		if ( 'gatherpress_event' !== $post_type && ! in_array( 'gatherpress_event', (array) $post_type, true ) ) {
+			return $where;
+		}
+
+		$date_query = $query->query_vars['date_query'];
+		if ( ! is_array( $date_query ) || empty( $date_query ) ) {
+			return $where;
+		}
+
+		$date_filter = is_array( $date_query[0] ) ? $date_query[0] : array();
+
+		$date_conditions = array();
+
+		if ( ! empty( $date_filter['year'] ) ) {
+			$year = absint( $date_filter['year'] );
+			$date_conditions[] = $wpdb->prepare( 'YEAR(ge.datetime_start_gmt) = %d', $year );
+		}
+
+		if ( ! empty( $date_filter['month'] ) ) {
+			$month = absint( $date_filter['month'] );
+			$date_conditions[] = $wpdb->prepare( 'MONTH(ge.datetime_start_gmt) = %d', $month );
+		}
+
+		if ( empty( $date_conditions ) ) {
+			return $where;
+		}
+
+		$where = preg_replace(
+			'/AND\s*\(\s*\(\s*YEAR\(\s*[^)]+\s*\)\s*=\s*\d+(?:\s+AND\s+MONTH\(\s*[^)]+\s*\)\s*=\s*\d+)?\s*\)\s*\)/',
+			'',
+			$where
+		);
+
+		$events_table = $wpdb->prefix . 'gatherpress_events';
+		$date_where = implode( ' AND ', $date_conditions );
+
+		$where .= " AND {$wpdb->posts}.ID IN (
+			SELECT ge.post_id 
+			FROM {$events_table} ge 
+			WHERE {$date_where}
+		)";
+
+		return $where;
+	}
+}
+
+// ============================================================================
+// FILE: includes/core/class-cache-invalidation.php
+// ============================================================================
+
+/**
+ * Cache invalidation class.
+ *
+ * @since 0.1.0
+ */
+class CacheInvalidation {
+	/**
+	 * Class instance.
+	 *
+	 * @since 0.1.0
+	 * @var CacheInvalidation|null
+	 */
+	private static $instance = null;
+
+	/**
+	 * Get class instance.
+	 *
+	 * @since 0.1.0
+	 *
+	 * @return CacheInvalidation
+	 */
+	public static function get_instance(): CacheInvalidation {
+		if ( null === self::$instance ) {
+			self::$instance = new self();
+		}
+
+		return self::$instance;
+	}
+
+	/**
+	 * Constructor.
+	 *
+	 * @since 0.1.0
+	 */
+	private function __construct() {}
+
+	/**
+	 * Clear cache when event post status changes.
+	 *
+	 * @since 0.1.0
+	 *
+	 * @param string   $new_status New post status.
+	 * @param string   $old_status Old post status.
+	 * @param \WP_Post $post       Post object.
+	 * @return void
+	 */
+	public function clear_cache_on_status_change( string $new_status, string $old_status, $post ): void {
+		if ( ! is_object( $post ) || ! isset( $post->post_type ) ) {
+			return;
+		}
+		
+		if ( ! post_type_supports( $post->post_type, 'gatherpress_statistics' ) ) {
+			return;
+		}
+		
+		if ( 'publish' === $new_status || 'publish' === $old_status ) {
+			if ( $new_status !== $old_status ) {
+				Cache::get_instance()->clear_cache();
+			}
+		}
+	}
+
+	/**
+	 * Clear cache when attendee count post meta is updated.
+	 *
+	 * @since 0.1.0
+	 *
+	 * @param int    $meta_id  ID of updated metadata entry.
+	 * @param int    $post_id  Post ID.
+	 * @param string $meta_key Meta key that was updated.
+	 * @return void
+	 */
+	public function clear_cache_on_meta_update( int $meta_id, int $post_id, string $meta_key ): void {
+		if ( 'gatherpress_attendee_count' === $meta_key && Support::get_instance()->is_supported_post( $post_id ) ) {
+			Cache::get_instance()->clear_cache();
+		}
+	}
+
+	/**
+	 * Clear cache when attendee count post meta is deleted.
+	 *
+	 * @since 0.1.0
+	 *
+	 * @param array<int>|int $meta_ids Meta ID or array of meta IDs.
+	 * @param int            $post_id  Post ID.
+	 * @param string         $meta_key Meta key.
+	 * @return void
+	 */
+	public function clear_cache_on_meta_delete( $meta_ids, int $post_id, string $meta_key ): void {
+		if ( 'gatherpress_attendee_count' === $meta_key && Support::get_instance()->is_supported_post( $post_id ) ) {
+			Cache::get_instance()->clear_cache();
+		}
+	}
+
+	/**
+	 * Clear cache when taxonomy terms are modified.
+	 *
+	 * @since 0.1.0
+	 *
+	 * @param int    $term_id  Term ID.
+	 * @param int    $tt_id    Term taxonomy ID.
+	 * @param string $taxonomy Taxonomy slug.
+	 * @return void
+	 */
+	public function clear_cache_on_term_change( int $term_id, int $tt_id, string $taxonomy ): void {
+		if ( ! $this->should_clear_cache_for_term_changes() ) {
+			return;
+		}
+		
+		$supported_taxonomies = Taxonomy::get_instance()->get_filtered_taxonomies();
+
+		if ( empty( $supported_taxonomies ) || ! is_array( $supported_taxonomies ) ) {
+			return;
+		}
+
+		$taxonomy_slugs = array();
+		foreach ( $supported_taxonomies as $tax_obj ) {
+			if ( isset( $tax_obj->name ) ) {
+				$taxonomy_slugs[] = $tax_obj->name;
+			}
+		}
+
+		if ( in_array( $taxonomy, $taxonomy_slugs, true ) ) {
+			Cache::get_instance()->clear_cache();
+		}
+	}
+
+	/**
+	 * Clear cache when term relationships change.
+	 *
+	 * @since 0.1.0
+	 *
+	 * @param int                 $object_id Object ID.
+	 * @param array<int, int>     $terms     Term IDs.
+	 * @param array<int, int>     $tt_ids    Term taxonomy IDs.
+	 * @return void
+	 */
+	public function clear_cache_on_term_relationship( int $object_id, array $terms, array $tt_ids ): void {
+		if ( Support::get_instance()->is_supported_post( $object_id ) ) {
+			Cache::get_instance()->clear_cache();
+		}
+	}
+
+	/**
+	 * Check if term changes require cache clearing.
+	 *
+	 * @since 0.1.0
+	 *
+	 * @return bool True if cache should be cleared.
+	 */
+	private function should_clear_cache_for_term_changes(): bool {
+		$supported_types = Support::get_instance()->get_supported_statistic_types();
+		
+		if ( empty( $supported_types ) ) {
+			return false;
+		}
+		
+		$term_dependent_types = array(
+			'events_per_taxonomy',
+			'events_multi_taxonomy',
+			'total_taxonomy_terms',
+			'taxonomy_terms_by_taxonomy',
+		);
+		
+		foreach ( $term_dependent_types as $type ) {
+			if ( in_array( $type, $supported_types, true ) ) {
+				return true;
+			}
+		}
+		
+		return false;
+	}
+}
+
+// ============================================================================
+// FILE: includes/admin/class-rest-api.php
+// ============================================================================
+
+/**
+ * REST API endpoints class.
+ *
+ * @since 0.1.0
+ */
+class RestApi {
+	/**
+	 * Class instance.
+	 *
+	 * @since 0.1.0
+	 * @var RestApi|null
+	 */
+	private static $instance = null;
+
+	/**
+	 * Get class instance.
+	 *
+	 * @since 0.1.0
+	 *
+	 * @return RestApi
+	 */
+	public static function get_instance(): RestApi {
+		if ( null === self::$instance ) {
+			self::$instance = new self();
+		}
+
+		return self::$instance;
+	}
+
+	/**
+	 * Constructor.
+	 *
+	 * @since 0.1.0
+	 */
+	private function __construct() {}
+
+	/**
+	 * Register REST API routes.
+	 *
+	 * @since 0.1.0
+	 *
+	 * @return void
+	 */
+	public function register_rest_routes(): void {
+		\register_rest_route(
+			'gatherpress-statistics/v1',
+			'/taxonomies',
+			array(
+				'methods'             => 'GET',
+				'callback'            => array( $this, 'get_taxonomies_endpoint' ),
+				'permission_callback' => function (): bool {
+					return current_user_can( 'edit_posts' );
+				},
+			)
+		);
+		
+		\register_rest_route(
+			'gatherpress-statistics/v1',
+			'/supported-types',
+			array(
+				'methods'             => 'GET',
+				'callback'            => array( $this, 'get_supported_types_endpoint' ),
+				'permission_callback' => function (): bool {
+					return current_user_can( 'edit_posts' );
+				},
+			)
+		);
+	}
+
+	/**
+	 * REST API endpoint to get filtered taxonomies.
+	 *
+	 * @since 0.1.0
+	 *
+	 * @return \WP_REST_Response List of taxonomies.
+	 */
+	public function get_taxonomies_endpoint(): \WP_REST_Response {
+		$taxonomies = Taxonomy::get_instance()->get_filtered_taxonomies( true );
+		
+		if ( empty( $taxonomies ) ) {
+			return new \WP_REST_Response( array(), 200 );
+		}
+		
+		$formatted_taxonomies = array();
+		foreach ( $taxonomies as $taxonomy ) {
+			if ( isset( $taxonomy->name ) && isset( $taxonomy->labels->name ) ) {
+				$formatted_taxonomies[] = array(
+					'slug' => $taxonomy->name,
+					'name' => $taxonomy->labels->name,
+				);
+			}
+		}
+		
+		return new \WP_REST_Response( $formatted_taxonomies, 200 );
+	}
+
+	/**
+	 * REST API endpoint to get supported statistic types.
+	 *
+	 * @since 0.1.0
+	 *
+	 * @return \WP_REST_Response List of supported types.
+	 */
+	public function get_supported_types_endpoint(): \WP_REST_Response {
+		$supported_types = Support::get_instance()->get_supported_statistic_types();
+		
+		return new \WP_REST_Response( $supported_types, 200 );
+	}
+}
+
+// ============================================================================
+// FILE: includes/admin/class-admin-page.php
+// ============================================================================
+
+/**
+ * Admin page class.
+ *
+ * @since 0.1.0
+ */
+class AdminPage {
+	/**
+	 * Class instance.
+	 *
+	 * @since 0.1.0
+	 * @var AdminPage|null
+	 */
+	private static $instance = null;
+
+	/**
+	 * Get class instance.
+	 *
+	 * @since 0.1.0
+	 *
+	 * @return AdminPage
+	 */
+	public static function get_instance(): AdminPage {
+		if ( null === self::$instance ) {
+			self::$instance = new self();
+		}
+
+		return self::$instance;
+	}
+
+	/**
+	 * Constructor.
+	 *
+	 * @since 0.1.0
+	 */
+	private function __construct() {}
+
+	/**
+	 * Enqueue admin assets.
+	 *
+	 * @since 0.1.0
+	 *
+	 * @param string $hook Current admin page hook.
+	 * @return void
+	 */
+	public function enqueue_admin_assets( string $hook ): void {
+		if ( 'dashboard_page_gatherpress-statistics-archive' !== $hook ) {
+			return;
+		}
+
+		wp_enqueue_script(
+			'chartjs',
+			'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js',
+			array(),
+			'4.4.1',
+			true
+		);
 	}
 
 	/**
@@ -230,8 +1805,7 @@ class Plugin {
 			return;
 		}
 
-		// Generate statistics for the specified month
-		$result = $this->archive_statistics_for_month( $year, $month );
+		$result = Archive::get_instance()->archive_statistics_for_month( $year, $month );
 
 		if ( $result ) {
 			add_settings_error(
@@ -251,100 +1825,6 @@ class Plugin {
 	}
 
 	/**
-	 * Generate archive statistics for a specific month.
-	 *
-	 * @since 0.1.0
-	 *
-	 * @global \wpdb $wpdb WordPress database abstraction object.
-	 * @param int $year  Year to generate statistics for.
-	 * @param int $month Month to generate statistics for.
-	 * @return bool True on success, false on failure.
-	 */
-	public function archive_statistics_for_month( int $year, int $month ): bool {
-		global $wpdb;
-		
-		$table_name = $wpdb->prefix . 'gatherpress_statistics_archive';
-		$current_time = current_time( 'mysql' );
-		
-		// Get all common configs
-		$configs = $this->get_common_configs();
-		
-		if ( empty( $configs ) ) {
-			return false;
-		}
-
-		$success_count = 0;
-		
-		foreach ( $configs as $config ) {
-			if ( ! isset( $config['type'] ) || ! isset( $config['filters'] ) ) {
-				continue;
-			}
-			
-			// CRITICAL: For statistical purposes, always set event_query to 'past'
-			$config['filters']['event_query'] = 'past';
-			
-			// Add year and month to filters for calculation
-			$filters_with_date = array_merge( $config['filters'], array(
-				'year'  => $year,
-				'month' => $month,
-			) );
-			
-			$value = $this->calculate( $config['type'], $filters_with_date );
-			$filters_hash = md5( wp_json_encode( $config['filters'] ) );
-			
-			// Check if this exact statistic already exists
-			$exists = $wpdb->get_var(
-				$wpdb->prepare(
-					"SELECT id FROM {$table_name} 
-					 WHERE statistic_type = %s 
-					 AND statistic_year = %d 
-					 AND statistic_month = %d 
-					 AND filters_hash = %s",
-					$config['type'],
-					$year,
-					$month,
-					$filters_hash
-				)
-			);
-
-			if ( $exists ) {
-				// Update existing record
-				$result = $wpdb->update(
-					$table_name,
-					array(
-						'statistic_value' => $value,
-						'archived_at'     => $current_time,
-					),
-					array( 'id' => $exists ),
-					array( '%d', '%s' ),
-					array( '%d' )
-				);
-			} else {
-				// Insert new record
-				$result = $wpdb->insert(
-					$table_name,
-					array(
-						'statistic_type'  => $config['type'],
-						'statistic_year'  => $year,
-						'statistic_month' => $month,
-						'filters_hash'    => $filters_hash,
-						'filters_data'    => wp_json_encode( $config['filters'] ),
-						'statistic_value' => $value,
-						'archived_at'     => $current_time,
-					),
-					array( '%s', '%d', '%d', '%s', '%s', '%d', '%s' )
-				);
-			}
-
-			if ( false !== $result ) {
-				$success_count++;
-			}
-		}
-
-		return $success_count > 0;
-	}
-
-	/**
 	 * Get human-readable label for statistic type.
 	 *
 	 * @since 0.1.0
@@ -352,7 +1832,7 @@ class Plugin {
 	 * @param string $type Statistic type slug.
 	 * @return string Human-readable label.
 	 */
-	public function get_statistic_type_label( string $type ): string {
+	private function get_statistic_type_label( string $type ): string {
 		$labels = array(
 			'total_events'                => __( 'Total Events', 'gatherpress-statistics' ),
 			'events_per_taxonomy'         => __( 'Events per Taxonomy', 'gatherpress-statistics' ),
@@ -363,6 +1843,89 @@ class Plugin {
 		);
 
 		return isset( $labels[ $type ] ) ? $labels[ $type ] : ucwords( str_replace( '_', ' ', $type ) );
+	}
+
+	/**
+	 * Prepare chart data from statistics.
+	 *
+	 * @since 0.1.0
+	 *
+	 * @param array  $statistics Array of statistics from database.
+	 * @param string $type       Current statistic type.
+	 * @return array Chart data structure.
+	 */
+	private function prepare_chart_data( array $statistics, string $type ): array {
+		if ( empty( $statistics ) ) {
+			return array();
+		}
+
+		$data_by_term = array();
+		$all_dates = array();
+
+		foreach ( $statistics as $stat ) {
+			$filters = json_decode( $stat->filters_data, true );
+			$date_key = sprintf( '%d-%02d', $stat->statistic_year, $stat->statistic_month );
+			$all_dates[ $date_key ] = true;
+
+			$term_label = 'All';
+			$term_id = 0;
+
+			if ( isset( $filters['term_id'] ) && $filters['term_id'] > 0 ) {
+				$term = get_term( $filters['term_id'] );
+				if ( $term && ! is_wp_error( $term ) ) {
+					$term_label = $term->name;
+					$term_id = $term->term_id;
+				}
+			}
+
+			if ( ! isset( $data_by_term[ $term_id ] ) ) {
+				$data_by_term[ $term_id ] = array(
+					'label' => $term_label,
+					'data' => array(),
+				);
+			}
+
+			$data_by_term[ $term_id ]['data'][ $date_key ] = $stat->statistic_value;
+		}
+
+		$dates = array_keys( $all_dates );
+		sort( $dates );
+
+		$datasets = array();
+		$colors = array(
+			'#3366CC', '#DC3912', '#FF9900', '#109618', '#990099',
+			'#3B3EAC', '#0099C6', '#DD4477', '#66AA00', '#B82E2E',
+		);
+		$color_index = 0;
+
+		foreach ( $data_by_term as $term_id => $term_data ) {
+			$values = array();
+			foreach ( $dates as $date ) {
+				$values[] = isset( $term_data['data'][ $date ] ) ? $term_data['data'][ $date ] : 0;
+			}
+
+			$color = $colors[ $color_index % count( $colors ) ];
+			$color_index++;
+
+			$datasets[] = array(
+				'label' => $term_data['label'],
+				'data' => $values,
+				'termId' => $term_id,
+				'borderColor' => $color,
+				'backgroundColor' => $color . '33',
+				'tension' => 0.4,
+			);
+		}
+
+		$labels = array_map( function( $date ) {
+			list( $year, $month ) = explode( '-', $date );
+			return date_i18n( 'M Y', mktime( 0, 0, 0, (int) $month, 1, (int) $year ) );
+		}, $dates );
+
+		return array(
+			'labels' => $labels,
+			'datasets' => $datasets,
+		);
 	}
 
 	/**
@@ -378,7 +1941,6 @@ class Plugin {
 		
 		$table_name = $wpdb->prefix . 'gatherpress_statistics_archive';
 		
-		// Get filter parameters
 		$selected_year = isset( $_GET['year'] ) ? absint( $_GET['year'] ) : null;
 		$selected_month = isset( $_GET['month'] ) ? absint( $_GET['month'] ) : null;
 		$selected_taxonomy = isset( $_GET['taxonomy'] ) ? sanitize_text_field( $_GET['taxonomy'] ) : null;
@@ -387,18 +1949,14 @@ class Plugin {
 		$order_by = isset( $_GET['orderby'] ) ? sanitize_text_field( $_GET['orderby'] ) : 'statistic_year';
 		$order = isset( $_GET['order'] ) && $_GET['order'] === 'asc' ? 'ASC' : 'DESC';
 		
-		// Get supported statistic types for tabs
-		$supported_types = $this->get_supported_statistic_types();
+		$supported_types = Support::get_instance()->get_supported_statistic_types();
 		
-		// Default to first supported type if no tab selected
 		if ( empty( $current_tab ) && ! empty( $supported_types ) ) {
 			$current_tab = $supported_types[0];
 		}
 		
-		// Get available years
 		$years = $wpdb->get_col( "SELECT DISTINCT statistic_year FROM {$table_name} ORDER BY statistic_year DESC" );
 		
-		// Get available taxonomies from filters_data
 		$taxonomies = array();
 		$all_filters = $wpdb->get_col( "SELECT DISTINCT filters_data FROM {$table_name}" );
 		foreach ( $all_filters as $filters_json ) {
@@ -409,11 +1967,9 @@ class Plugin {
 		}
 		sort( $taxonomies );
 		
-		// Build base query
 		$where_clauses = array();
 		$query_params = array();
 		
-		// Filter by tab (statistic type)
 		if ( ! empty( $current_tab ) ) {
 			$where_clauses[] = 'statistic_type = %s';
 			$query_params[] = $current_tab;
@@ -429,7 +1985,6 @@ class Plugin {
 			$query_params[] = $selected_month;
 		}
 		
-		// Filter by taxonomy or term in filters_data
 		if ( $selected_taxonomy || $selected_term ) {
 			$json_conditions = array();
 			if ( $selected_taxonomy ) {
@@ -445,16 +2000,13 @@ class Plugin {
 		
 		$where_sql = ! empty( $where_clauses ) ? 'WHERE ' . implode( ' AND ', $where_clauses ) : '';
 		
-		// Validate order_by
 		$allowed_order_by = array( 'statistic_year', 'statistic_month', 'statistic_value', 'archived_at', 'taxonomy', 'term' );
 		if ( ! in_array( $order_by, $allowed_order_by, true ) ) {
 			$order_by = 'statistic_year';
 		}
 		
-		// Build order clause with secondary sorting
 		$order_clause = "ORDER BY {$order_by} {$order}, statistic_month {$order}";
 		
-		// Get statistics
 		$query = "SELECT * FROM {$table_name} {$where_sql} {$order_clause}";
 		
 		if ( ! empty( $query_params ) ) {
@@ -463,11 +2015,9 @@ class Plugin {
 		
 		$statistics = $wpdb->get_results( $query );
 		
-		// Get current year and month for generation form
 		$current_year = (int) date( 'Y' );
 		$current_month = (int) date( 'n' );
 		
-		// Build URL for sorting and filtering
 		$base_url = add_query_arg( array(
 			'page' => 'gatherpress-statistics-archive',
 			'tab' => $current_tab,
@@ -477,13 +2027,10 @@ class Plugin {
 			'term_id' => $selected_term,
 		), admin_url( 'index.php' ) );
 		
-		// Toggle order direction
 		$next_order = ( $order === 'ASC' ) ? 'desc' : 'asc';
 		
-		// Prepare chart data
 		$chart_data = $this->prepare_chart_data( $statistics, $current_tab );
 		
-		// Render page
 		?>
 		<div class="wrap">
 			<h1><?php echo esc_html( get_admin_page_title() ); ?></h1>
@@ -553,9 +2100,6 @@ class Plugin {
 					</div>
 					<canvas id="gatherpress-stats-chart" width="400" height="150"></canvas>
 				</div>
-				<?php
-				// Inline admin styles
-				?>
 				<style>
 					.gatherpress-stats-chart-container {
 						margin: 20px 0;
@@ -609,9 +2153,6 @@ class Plugin {
 						font-size: 14px;
 					}
 				</style>
-				<?php
-				// Inline admin JavaScript
-				?>
 				<script type="text/javascript">
 					var gatherpressChartData = <?php echo wp_json_encode( $chart_data ); ?>;
 					
@@ -801,7 +2342,6 @@ class Plugin {
 					</thead>
 					<tbody>
 						<?php 
-						// Sort data for taxonomy/term columns if needed
 						if ( in_array( $order_by, array( 'taxonomy', 'term' ), true ) ) {
 							usort( $statistics, function( $a, $b ) use ( $order_by, $order ) {
 								$filters_a = json_decode( $a->filters_data, true );
@@ -868,93 +2408,47 @@ class Plugin {
 		</div>
 		<?php
 	}
+}
+
+// ============================================================================
+// FILE: includes/admin/class-archive.php
+// ============================================================================
+
+/**
+ * Archive management class.
+ *
+ * @since 0.1.0
+ */
+class Archive {
+	/**
+	 * Class instance.
+	 *
+	 * @since 0.1.0
+	 * @var Archive|null
+	 */
+	private static $instance = null;
 
 	/**
-	 * Prepare chart data from statistics.
+	 * Get class instance.
 	 *
 	 * @since 0.1.0
 	 *
-	 * @param array  $statistics Array of statistics from database.
-	 * @param string $type       Current statistic type.
-	 * @return array Chart data structure.
+	 * @return Archive
 	 */
-	private function prepare_chart_data( array $statistics, string $type ): array {
-		if ( empty( $statistics ) ) {
-			return array();
+	public static function get_instance(): Archive {
+		if ( null === self::$instance ) {
+			self::$instance = new self();
 		}
 
-		// Group data by term
-		$data_by_term = array();
-		$all_dates = array();
-
-		foreach ( $statistics as $stat ) {
-			$filters = json_decode( $stat->filters_data, true );
-			$date_key = sprintf( '%d-%02d', $stat->statistic_year, $stat->statistic_month );
-			$all_dates[ $date_key ] = true;
-
-			$term_label = 'All';
-			$term_id = 0;
-
-			if ( isset( $filters['term_id'] ) && $filters['term_id'] > 0 ) {
-				$term = get_term( $filters['term_id'] );
-				if ( $term && ! is_wp_error( $term ) ) {
-					$term_label = $term->name;
-					$term_id = $term->term_id;
-				}
-			}
-
-			if ( ! isset( $data_by_term[ $term_id ] ) ) {
-				$data_by_term[ $term_id ] = array(
-					'label' => $term_label,
-					'data' => array(),
-				);
-			}
-
-			$data_by_term[ $term_id ]['data'][ $date_key ] = $stat->statistic_value;
-		}
-
-		// Sort dates
-		$dates = array_keys( $all_dates );
-		sort( $dates );
-
-		// Build datasets
-		$datasets = array();
-		$colors = array(
-			'#3366CC', '#DC3912', '#FF9900', '#109618', '#990099',
-			'#3B3EAC', '#0099C6', '#DD4477', '#66AA00', '#B82E2E',
-		);
-		$color_index = 0;
-
-		foreach ( $data_by_term as $term_id => $term_data ) {
-			$values = array();
-			foreach ( $dates as $date ) {
-				$values[] = isset( $term_data['data'][ $date ] ) ? $term_data['data'][ $date ] : 0;
-			}
-
-			$color = $colors[ $color_index % count( $colors ) ];
-			$color_index++;
-
-			$datasets[] = array(
-				'label' => $term_data['label'],
-				'data' => $values,
-				'termId' => $term_id,
-				'borderColor' => $color,
-				'backgroundColor' => $color . '33',
-				'tension' => 0.4,
-			);
-		}
-
-		// Format dates for labels
-		$labels = array_map( function( $date ) {
-			list( $year, $month ) = explode( '-', $date );
-			return date_i18n( 'M Y', mktime( 0, 0, 0, (int) $month, 1, (int) $year ) );
-		}, $dates );
-
-		return array(
-			'labels' => $labels,
-			'datasets' => $datasets,
-		);
+		return self::$instance;
 	}
+
+	/**
+	 * Constructor.
+	 *
+	 * @since 0.1.0
+	 */
+	private function __construct() {}
 
 	/**
 	 * Archive monthly statistics.
@@ -971,1142 +2465,97 @@ class Plugin {
 	}
 
 	/**
-	 * Register REST API routes.
-	 *
-	 * @since 0.1.0
-	 *
-	 * @return void
-	 */
-	public function register_rest_routes(): void {
-		\register_rest_route(
-			'gatherpress-statistics/v1',
-			'/taxonomies',
-			array(
-				'methods'             => 'GET',
-				'callback'            => array( $this, 'get_taxonomies_endpoint' ),
-				'permission_callback' => function (): bool {
-					return current_user_can( 'edit_posts' );
-				},
-			)
-		);
-		
-		\register_rest_route(
-			'gatherpress-statistics/v1',
-			'/supported-types',
-			array(
-				'methods'             => 'GET',
-				'callback'            => array( $this, 'get_supported_types_endpoint' ),
-				'permission_callback' => function (): bool {
-					return current_user_can( 'edit_posts' );
-				},
-			)
-		);
-	}
-
-	/**
-	 * REST API endpoint to get filtered taxonomies.
-	 *
-	 * @since 0.1.0
-	 *
-	 * @return \WP_REST_Response List of taxonomies.
-	 */
-	public function get_taxonomies_endpoint(): \WP_REST_Response {
-		$taxonomies = $this->get_filtered_taxonomies( true );
-		
-		if ( empty( $taxonomies ) ) {
-			return new \WP_REST_Response( array(), 200 );
-		}
-		
-		$formatted_taxonomies = array();
-		foreach ( $taxonomies as $taxonomy ) {
-			if ( isset( $taxonomy->name ) && isset( $taxonomy->labels->name ) ) {
-				$formatted_taxonomies[] = array(
-					'slug' => $taxonomy->name,
-					'name' => $taxonomy->labels->name,
-				);
-			}
-		}
-		
-		return new \WP_REST_Response( $formatted_taxonomies, 200 );
-	}
-
-	/**
-	 * REST API endpoint to get supported statistic types.
-	 *
-	 * @since 0.1.0
-	 *
-	 * @return \WP_REST_Response List of supported types.
-	 */
-	public function get_supported_types_endpoint(): \WP_REST_Response {
-		$supported_types = $this->get_supported_statistic_types();
-		
-		return new \WP_REST_Response( $supported_types, 200 );
-	}
-
-	/**
-	 * Clear cache when event post status changes.
-	 *
-	 * @since 0.1.0
-	 *
-	 * @param string   $new_status New post status.
-	 * @param string   $old_status Old post status.
-	 * @param \WP_Post $post       Post object.
-	 * @return void
-	 */
-	public function clear_cache_on_status_change( string $new_status, string $old_status, $post ): void {
-		if ( ! is_object( $post ) || ! isset( $post->post_type ) ) {
-			return;
-		}
-		
-		if ( ! post_type_supports( $post->post_type, 'gatherpress_statistics' ) ) {
-			return;
-		}
-		
-		if ( 'publish' === $new_status || 'publish' === $old_status ) {
-			if ( $new_status !== $old_status ) {
-				$this->clear_cache();
-			}
-		}
-	}
-
-	/**
-	 * Clear cache when attendee count post meta is updated.
-	 *
-	 * @since 0.1.0
-	 *
-	 * @param int    $meta_id  ID of updated metadata entry.
-	 * @param int    $post_id  Post ID.
-	 * @param string $meta_key Meta key that was updated.
-	 * @return void
-	 */
-	public function clear_cache_on_meta_update( int $meta_id, int $post_id, string $meta_key ): void {
-		if ( 'gatherpress_attendee_count' === $meta_key && $this->is_supported_post( $post_id ) ) {
-			$this->clear_cache();
-		}
-	}
-
-	/**
-	 * Clear cache when attendee count post meta is deleted.
-	 *
-	 * @since 0.1.0
-	 *
-	 * @param array<int>|int $meta_ids Meta ID or array of meta IDs.
-	 * @param int            $post_id  Post ID.
-	 * @param string         $meta_key Meta key.
-	 * @return void
-	 */
-	public function clear_cache_on_meta_delete( $meta_ids, int $post_id, string $meta_key ): void {
-		if ( 'gatherpress_attendee_count' === $meta_key && $this->is_supported_post( $post_id ) ) {
-			$this->clear_cache();
-		}
-	}
-
-	/**
-	 * Clear cache when taxonomy terms are modified.
-	 *
-	 * @since 0.1.0
-	 *
-	 * @param int    $term_id  Term ID.
-	 * @param int    $tt_id    Term taxonomy ID.
-	 * @param string $taxonomy Taxonomy slug.
-	 * @return void
-	 */
-	public function clear_cache_on_term_change( int $term_id, int $tt_id, string $taxonomy ): void {
-		if ( ! $this->should_clear_cache_for_term_changes() ) {
-			return;
-		}
-		
-		$supported_taxonomies = $this->get_filtered_taxonomies();
-
-		if ( empty( $supported_taxonomies ) || ! is_array( $supported_taxonomies ) ) {
-			return;
-		}
-
-		$taxonomy_slugs = array();
-		foreach ( $supported_taxonomies as $tax_obj ) {
-			if ( isset( $tax_obj->name ) ) {
-				$taxonomy_slugs[] = $tax_obj->name;
-			}
-		}
-
-		if ( in_array( $taxonomy, $taxonomy_slugs, true ) ) {
-			$this->clear_cache();
-		}
-	}
-
-	/**
-	 * Clear cache when term relationships change.
-	 *
-	 * @since 0.1.0
-	 *
-	 * @param int                 $object_id Object ID.
-	 * @param array<int, int>     $terms     Term IDs.
-	 * @param array<int, int>     $tt_ids    Term taxonomy IDs.
-	 * @return void
-	 */
-	public function clear_cache_on_term_relationship( int $object_id, array $terms, array $tt_ids ): void {
-		if ( $this->is_supported_post( $object_id ) ) {
-			$this->clear_cache();
-		}
-	}
-
-	/**
-	 * Filter SQL WHERE clause to use GatherPress event dates instead of post dates.
-	 *
-	 * This filter intercepts queries for gatherpress_event posts that have both
-	 * the 'gatherpress_event_query' parameter and a date_query defined. It removes
-	 * the WordPress post date filtering and replaces it with GatherPress event date
-	 * filtering from the gatherpress_events table.
+	 * Generate archive statistics for a specific month.
 	 *
 	 * @since 0.1.0
 	 *
 	 * @global \wpdb $wpdb WordPress database abstraction object.
-	 * @param string    $where The WHERE clause of the query.
-	 * @param \WP_Query $query The WP_Query instance.
-	 * @return string Modified WHERE clause.
+	 * @param int $year  Year to generate statistics for.
+	 * @param int $month Month to generate statistics for.
+	 * @return bool True on success, false on failure.
 	 */
-	public function filter_gatherpress_event_dates( string $where, \WP_Query $query ): string {
+	public function archive_statistics_for_month( int $year, int $month ): bool {
 		global $wpdb;
-
-		// Only apply if date_query is set
-		if ( empty( $query->query_vars['date_query'] ) ) {
-			return $where;
-		}
-
-		// Only apply to gatherpress_event post type
-		$post_type = $query->get( 'post_type' );
-		if ( 'gatherpress_event' !== $post_type && ! in_array( 'gatherpress_event', (array) $post_type, true ) ) {
-			return $where;
-		}
-
-		$date_query = $query->query_vars['date_query'];
-		if ( ! is_array( $date_query ) || empty( $date_query ) ) {
-			return $where;
-		}
-
-		// Get the first date_query element (our year/month filter)
-		$date_filter = is_array( $date_query[0] ) ? $date_query[0] : array();
-
-		// Build the date conditions for GatherPress events table
-		$date_conditions = array();
-
-		if ( ! empty( $date_filter['year'] ) ) {
-			$year = absint( $date_filter['year'] );
-			$date_conditions[] = $wpdb->prepare( 'YEAR(ge.datetime_start_gmt) = %d', $year );
-		}
-
-		if ( ! empty( $date_filter['month'] ) ) {
-			$month = absint( $date_filter['month'] );
-			$date_conditions[] = $wpdb->prepare( 'MONTH(ge.datetime_start_gmt) = %d', $month );
-		}
-
-		// Only proceed if we have date conditions to add
-		if ( empty( $date_conditions ) ) {
-			return $where;
-		}
-
-		// Remove the WordPress post_date filtering that was added by date_query
-		$where = preg_replace(
-			'/AND\s*\(\s*\(\s*YEAR\(\s*[^)]+\s*\)\s*=\s*\d+(?:\s+AND\s+MONTH\(\s*[^)]+\s*\)\s*=\s*\d+)?\s*\)\s*\)/',
-			'',
-			$where
-		);
-
-		// Add our GatherPress event date filter using a subquery
-		$events_table = $wpdb->prefix . 'gatherpress_events';
-		$date_where = implode( ' AND ', $date_conditions );
-
-		$where .= " AND {$wpdb->posts}.ID IN (
-			SELECT ge.post_id 
-			FROM {$events_table} ge 
-			WHERE {$date_where}
-		)";
-
-		return $where;
-	}
-
-	/**
-	 * Get the statistics support configuration for a post type.
-	 *
-	 * @since 0.1.0
-	 *
-	 * @param string $post_type Post type slug.
-	 * @return array<string, bool> Configuration array.
-	 */
-	public function get_support_config( string $post_type = 'gatherpress_event' ): array {
-		if ( ! post_type_supports( $post_type, 'gatherpress_statistics' ) ) {
-			return array();
-		}
 		
-		$supports = get_all_post_type_supports( $post_type );
+		$table_name = $wpdb->prefix . 'gatherpress_statistics_archive';
+		$current_time = current_time( 'mysql' );
 		
-		if ( isset( $supports['gatherpress_statistics'] ) && is_array( $supports['gatherpress_statistics'] ) ) {
-			return reset( $supports['gatherpress_statistics'] );
-		}
+		$configs = Cache::get_instance()->get_common_configs();
 		
-		return array(
-			'total_events'                => true,
-			'events_per_taxonomy'         => true,
-			'events_multi_taxonomy'       => true,
-			'total_taxonomy_terms'        => true,
-			'taxonomy_terms_by_taxonomy'  => true,
-			'total_attendees'             => true,
-		);
-	}
-
-	/**
-	 * Check if a specific statistic type is supported.
-	 *
-	 * @since 0.1.0
-	 *
-	 * @param string $statistic_type The statistic type to check.
-	 * @param string $post_type      Optional. Post type to check.
-	 * @return bool True if supported.
-	 */
-	public function is_statistic_type_supported( string $statistic_type, string $post_type = 'gatherpress_event' ): bool {
-		$config = $this->get_support_config( $post_type );
-		
-		if ( empty( $config ) ) {
+		if ( empty( $configs ) ) {
 			return false;
 		}
-		
-		return ! empty( $config[ $statistic_type ] );
-	}
 
-	/**
-	 * Get all supported statistic types for a post type.
-	 *
-	 * @since 0.1.0
-	 *
-	 * @param string $post_type Optional. Post type to check.
-	 * @return array<int, string> Array of supported statistic type slugs.
-	 */
-	public function get_supported_statistic_types( string $post_type = 'gatherpress_event' ): array {
-		$config = $this->get_support_config( $post_type );
+		$success_count = 0;
 		
-		if ( empty( $config ) ) {
-			return array();
-		}
-		
-		$enabled_types = array();
-		foreach ( $config as $type => $enabled ) {
-			if ( $enabled ) {
-				$enabled_types[] = $type;
-			}
-		}
-		
-		return $enabled_types;
-	}
-
-	/**
-	 * Get all post types that support gatherpress_statistics.
-	 *
-	 * @since 0.1.0
-	 *
-	 * @return array<int, string> Array of post type slugs.
-	 */
-	public function get_supported_post_types(): array {
-		$post_types = get_post_types_by_support( 'gatherpress_statistics' );
-		
-		if ( empty( $post_types ) || ! is_array( $post_types ) ) {
-			return array();
-		}
-		
-		return $post_types;
-	}
-
-	/**
-	 * Check if any post types support gatherpress_statistics.
-	 *
-	 * @since 0.1.0
-	 *
-	 * @return bool True if at least one post type supports statistics.
-	 */
-	public function has_supported_post_types(): bool {
-		$post_types = $this->get_supported_post_types();
-		return ! empty( $post_types );
-	}
-
-	/**
-	 * Check if a specific post is supported for statistics.
-	 *
-	 * @since 0.1.0
-	 *
-	 * @param int $post_id Post ID to check.
-	 * @return bool True if supported.
-	 */
-	public function is_supported_post( int $post_id ) : bool {
-		$post = get_post( $post_id );
-		
-		return post_type_supports( $post->post_type, 'gatherpress_statistics' ) 
-			&& $post->post_status === 'publish';
-	}
-
-	/**
-	 * Get all taxonomies registered for supported post types.
-	 *
-	 * @since 0.1.0
-	 *
-	 * @return array<int, \WP_Taxonomy> Array of taxonomy objects.
-	 */
-	public function get_taxonomies(): array {
-		$post_types = $this->get_supported_post_types();
-		
-		if ( empty( $post_types ) ) {
-			return array();
-		}
-		
-		$all_taxonomies = array();
-		
-		foreach ( $post_types as $post_type ) {
-			if ( ! post_type_exists( $post_type ) ) {
-				continue;
-			}
-			
-			$taxonomies = \get_object_taxonomies( $post_type, 'objects' );
-			
-			if ( ! empty( $taxonomies ) && is_array( $taxonomies ) ) {
-				foreach ( $taxonomies as $taxonomy ) {
-					if ( isset( $taxonomy->name ) ) {
-						$all_taxonomies[ $taxonomy->name ] = $taxonomy;
-					}
-				}
-			}
-		}
-		
-		return array_values( $all_taxonomies );
-	}
-
-	/**
-	 * Get filtered taxonomies.
-	 *
-	 * @since 0.1.0
-	 *
-	 * @param bool $for_editor Optional. Whether this is for editor selection.
-	 * @return array<int, \WP_Taxonomy> Array of taxonomy objects.
-	 */
-	public function get_filtered_taxonomies( bool $for_editor = false ): array {
-		$taxonomies = $this->get_taxonomies();
-		
-		if ( empty( $taxonomies ) || ! is_array( $taxonomies ) ) {
-			return array();
-		}
-		
-		$excluded_taxonomies = apply_filters(
-			'gatherpress_statistics_excluded_taxonomies',
-			array( '_gatherpress_venue' ),
-			$for_editor
-		);
-		
-		if ( ! is_array( $excluded_taxonomies ) ) {
-			$excluded_taxonomies = array();
-		}
-		
-		$filtered_taxonomies = array();
-		foreach ( $taxonomies as $taxonomy ) {
-			if ( ! isset( $taxonomy->name ) ) {
-				continue;
-			}
-			
-			if ( in_array( $taxonomy->name, $excluded_taxonomies, true ) ) {
-				continue;
-			}
-			
-			$filtered_taxonomies[] = $taxonomy;
-		}
-		
-		return $filtered_taxonomies;
-	}
-
-	/**
-	 * Get cache key for a specific statistic configuration.
-	 *
-	 * @since 0.1.0
-	 *
-	 * @param string               $statistic_type The type of statistic.
-	 * @param array<string, mixed> $filters        Additional filters.
-	 * @return string Cache key.
-	 */
-	public function get_cache_key( string $statistic_type, array $filters = array() ): string {
-		$statistic_type = is_string( $statistic_type ) ? $statistic_type : 'total_events';
-		$filters = is_array( $filters ) ? $filters : array();
-		
-		$key_parts = array( 'gatherpress_stats', $statistic_type );
-		
-		if ( ! empty( $filters['event_query'] ) && in_array( $filters['event_query'], array( 'upcoming', 'past' ), true ) ) {
-			$key_parts[] = sanitize_key( $filters['event_query'] );
-		}
-		
-		if ( ! empty( $filters ) ) {
-			$key_parts[] = md5( wp_json_encode( $filters ) );
-		}
-		
-		return implode( '_', $key_parts );
-	}
-
-	/**
-	 * Get cache expiration time in seconds.
-	 *
-	 * @since 0.1.0
-	 *
-	 * @return int Cache expiration time in seconds.
-	 */
-	public function get_cache_expiration(): int {
-		$expiration = apply_filters(
-			'gatherpress_statistics_cache_expiration',
-			12 * HOUR_IN_SECONDS
-		);
-		
-		if ( ! is_numeric( $expiration ) || $expiration < 1 ) {
-			$expiration = 12 * HOUR_IN_SECONDS;
-		}
-		
-		return absint( $expiration );
-	}
-
-	/**
-	 * Calculate statistics based on type and filters.
-	 *
-	 * @since 0.1.0
-	 *
-	 * @param string               $statistic_type The type of statistic to calculate.
-	 * @param array<string, mixed> $filters        Filters to apply.
-	 * @return int Calculated statistic value.
-	 */
-	public function calculate( string $statistic_type, array $filters = array() ): int {
-		if ( ! $this->has_supported_post_types() ) {
-			return 0;
-		}
-		
-		if ( ! $this->is_statistic_type_supported( $statistic_type ) ) {
-			return 0;
-		}
-
-		$statistic_type = is_string( $statistic_type ) ? $statistic_type : 'total_events';
-		$filters = is_array( $filters ) ? $filters : array();
-		
-		if ( empty( $filters['event_query'] ) || ! in_array( $filters['event_query'], array( 'upcoming', 'past' ), true ) ) {
-			return 0;
-		}
-		
-		$result = 0;
-		
-		switch ( $statistic_type ) {
-			case 'total_events':
-				$result = $this->count_events( $filters );
-				break;
-				
-			case 'events_per_taxonomy':
-				$result = $this->count_events( $filters );
-				break;
-				
-			case 'events_multi_taxonomy':
-				$result = $this->count_events( $filters );
-				break;
-				
-			case 'total_taxonomy_terms':
-				$result = $this->count_terms( $filters );
-				break;
-				
-			case 'taxonomy_terms_by_taxonomy':
-				$result = $this->terms_by_taxonomy( $filters );
-				break;
-				
-			case 'total_attendees':
-				$result = $this->count_attendees( $filters );
-				break;
-		}
-		
-		$result = is_numeric( $result ) ? absint( $result ) : 0;
-		
-		return apply_filters( 'gatherpress_stats_calculate_' . $statistic_type, $result, $filters );
-	}
-
-	/**
-	 * Build date query arguments from filters.
-	 *
-	 * @since 0.1.0
-	 *
-	 * @param array<string, mixed> $filters Query filters.
-	 * @return array<string, mixed> Date query arguments.
-	 */
-	private function build_date_query( array $filters ): array {
-		$date_query = array();
-		
-		if ( ! empty( $filters['year'] ) ) {
-			$year = absint( $filters['year'] );
-			if ( $year > 0 ) {
-				$date_query['year'] = $year;
-			}
-		}
-		
-		if ( ! empty( $filters['month'] ) ) {
-			$month = absint( $filters['month'] );
-			if ( $month >= 1 && $month <= 12 ) {
-				$date_query['month'] = $month;
-			}
-		}
-		
-		return $date_query;
-	}
-
-	/**
-	 * Count events with filters.
-	 *
-	 * @since 0.1.0
-	 *
-	 * @param array<string, mixed> $filters Query filters.
-	 * @return int Number of events.
-	 */
-	public function count_events( array $filters = array() ): int {
-		$post_types = $this->get_supported_post_types();
-		
-		if ( empty( $post_types ) ) {
-			return 0;
-		}
-		
-		$filters = is_array( $filters ) ? $filters : array();
-		
-		$args = array(
-			'post_type'      => $post_types,
-			'post_status'    => 'publish',
-			'posts_per_page' => -1,
-			'fields'         => 'ids',
-		);
-		
-		if ( isset( $filters['event_query'] ) && is_string( $filters['event_query'] ) ) {
-			$event_query = sanitize_key( $filters['event_query'] );
-			if ( in_array( $event_query, array( 'upcoming', 'past' ), true ) ) {
-				$args['gatherpress_event_query'] = $event_query;
-			}
-		}
-		
-		// Add date query for year/month filtering
-		$date_query = $this->build_date_query( $filters );
-		if ( ! empty( $date_query ) ) {
-			$args['date_query'] = array( $date_query );
-		}
-		
-		if ( ! empty( $filters['taxonomy'] ) && ! empty( $filters['term_id'] ) ) {
-			if ( taxonomy_exists( $filters['taxonomy'] ) ) {
-				$args['tax_query'] = array(
-					array(
-						'taxonomy' => sanitize_key( $filters['taxonomy'] ),
-						'field'    => 'term_id',
-						'terms'    => absint( $filters['term_id'] ),
-					),
-				);
-			}
-		}
-		else if ( ! empty( $filters['taxonomy_terms'] ) && is_array( $filters['taxonomy_terms'] ) ) {
-			$tax_query = array( 'relation' => 'AND' );
-			
-			foreach ( $filters['taxonomy_terms'] as $taxonomy => $term_ids ) {
-				if ( ! empty( $term_ids ) && is_array( $term_ids ) && taxonomy_exists( $taxonomy ) ) {
-					$tax_query[] = array(
-						'taxonomy' => sanitize_key( $taxonomy ),
-						'field'    => 'term_id',
-						'terms'    => array_map( 'absint', $term_ids ),
-					);
-				}
-			}
-			
-			if ( count( $tax_query ) > 1 ) {
-				$args['tax_query'] = $tax_query;
-			}
-		}
-		
-		$query = new \WP_Query( $args );
-		
-		return absint( $query->found_posts );
-	}
-
-	/**
-	 * Count total terms in a taxonomy.
-	 *
-	 * @since 0.1.0
-	 *
-	 * @param array<string, mixed> $filters Filters including taxonomy.
-	 * @return int Number of terms.
-	 */
-	public function count_terms( array $filters = array() ): int {
-		$post_types = $this->get_supported_post_types();
-		
-		if ( empty( $post_types ) ) {
-			return 0;
-		}
-		
-		$filters = is_array( $filters ) ? $filters : array();
-		$taxonomy = isset( $filters['taxonomy'] ) && is_string( $filters['taxonomy'] ) ? $filters['taxonomy'] : '';
-		
-		if ( empty( $taxonomy ) || ! taxonomy_exists( $taxonomy ) ) {
-			return 0;
-		}
-		
-		$args = array(
-			'taxonomy'   => sanitize_key( $taxonomy ),
-			'hide_empty' => true,
-			'object_ids' => null,
-		);
-		
-		$query_args = array(
-			'post_type'      => $post_types,
-			'post_status'    => 'publish',
-			'posts_per_page' => -1,
-			'fields'         => 'ids',
-		);
-		
-		// Add date query for year/month filtering
-		$date_query = $this->build_date_query( $filters );
-		if ( ! empty( $date_query ) ) {
-			$query_args['date_query'] = array( $date_query );
-		}
-		
-		$post_query = new \WP_Query( $query_args );
-		
-		if ( ! empty( $post_query->posts ) ) {
-			$args['object_ids'] = $post_query->posts;
-		}
-		
-		$terms = \get_terms( $args );
-		
-		if ( is_wp_error( $terms ) || ! is_array( $terms ) ) {
-			return 0;
-		}
-		
-		return absint( count( $terms ) );
-	}
-
-	/**
-	 * Count terms of one taxonomy that have events in another taxonomy.
-	 *
-	 * @since 0.1.0
-	 *
-	 * @param array<string, mixed> $filters Filters for cross-taxonomy counting.
-	 * @return int Number of unique terms.
-	 */
-	public function terms_by_taxonomy( array $filters = array() ): int {
-		$post_types = $this->get_supported_post_types();
-		
-		if ( empty( $post_types ) ) {
-			return 0;
-		}
-		
-		$filters = is_array( $filters ) ? $filters : array();
-		
-		$count_taxonomy  = isset( $filters['count_taxonomy'] ) && is_string( $filters['count_taxonomy'] ) ? $filters['count_taxonomy'] : '';
-		$filter_taxonomy = isset( $filters['filter_taxonomy'] ) && is_string( $filters['filter_taxonomy'] ) ? $filters['filter_taxonomy'] : '';
-		$term_id         = isset( $filters['term_id'] ) ? absint( $filters['term_id'] ) : 0;
-		
-		if ( empty( $count_taxonomy ) || empty( $filter_taxonomy ) || $term_id === 0 ) {
-			return 0;
-		}
-		
-		if ( ! taxonomy_exists( $count_taxonomy ) || ! taxonomy_exists( $filter_taxonomy ) ) {
-			return 0;
-		}
-		
-		$args = array(
-			'post_type'      => $post_types,
-			'post_status'    => 'publish',
-			'posts_per_page' => -1,
-			'fields'         => 'ids',
-			'tax_query'      => array(
-				array(
-					'taxonomy' => sanitize_key( $filter_taxonomy ),
-					'field'    => 'term_id',
-					'terms'    => $term_id,
-				),
-			),
-		);
-		
-		// Add date query for year/month filtering
-		$date_query = $this->build_date_query( $filters );
-		if ( ! empty( $date_query ) ) {
-			$args['date_query'] = array( $date_query );
-		}
-		
-		$query = new \WP_Query( $args );
-		$terms = array();
-		
-		if ( is_array( $query->posts ) ) {
-			foreach ( $query->posts as $post_id ) {
-				$post_terms = wp_get_post_terms( $post_id, sanitize_key( $count_taxonomy ), array( 'fields' => 'ids' ) );
-				
-				if ( ! is_wp_error( $post_terms ) && is_array( $post_terms ) && ! empty( $post_terms ) ) {
-					$terms = array_merge( $terms, $post_terms );
-				}
-			}
-		}
-		
-		return absint( count( array_unique( $terms ) ) );
-	}
-
-	/**
-	 * Count total attendees with filters.
-	 *
-	 * @since 0.1.0
-	 *
-	 * @param array<string, mixed> $filters Query filters.
-	 * @return int Total number of attendees.
-	 */
-	public function count_attendees( array $filters = array() ): int {
-		$post_types = $this->get_supported_post_types();
-		
-		if ( empty( $post_types ) ) {
-			return 0;
-		}
-		$filters = is_array( $filters ) ? $filters : array();
-		
-		$args = array(
-			'post_type'      => $post_types,
-			'post_status'    => 'publish',
-			'posts_per_page' => -1,
-			'fields'         => 'ids',
-		);
-		
-		if ( isset( $filters['event_query'] ) && is_string( $filters['event_query'] ) ) {
-			$event_query = sanitize_key( $filters['event_query'] );
-			if ( in_array( $event_query, array( 'upcoming', 'past' ), true ) ) {
-				$args['gatherpress_event_query'] = $event_query;
-			}
-		}
-		
-		// Add date query for year/month filtering
-		$date_query = $this->build_date_query( $filters );
-		if ( ! empty( $date_query ) ) {
-			$args['date_query'] = array( $date_query );
-		}
-		
-		if ( ! empty( $filters['taxonomy'] ) && ! empty( $filters['term_id'] ) ) {
-			if ( taxonomy_exists( $filters['taxonomy'] ) ) {
-				$args['tax_query'] = array(
-					array(
-						'taxonomy' => sanitize_key( $filters['taxonomy'] ),
-						'field'    => 'term_id',
-						'terms'    => absint( $filters['term_id'] ),
-					),
-				);
-			}
-		}
-		else if ( ! empty( $filters['taxonomy_terms'] ) && is_array( $filters['taxonomy_terms'] ) ) {
-			$tax_query = array( 'relation' => 'AND' );
-			
-			foreach ( $filters['taxonomy_terms'] as $taxonomy => $term_ids ) {
-				if ( ! empty( $term_ids ) && is_array( $term_ids ) && taxonomy_exists( $taxonomy ) ) {
-					$tax_query[] = array(
-						'taxonomy' => sanitize_key( $taxonomy ),
-						'field'    => 'term_id',
-						'terms'    => array_map( 'absint', $term_ids ),
-					);
-				}
-			}
-			
-			if ( count( $tax_query ) > 1 ) {
-				$args['tax_query'] = $tax_query;
-			}
-		}
-		
-		$query = new \WP_Query( $args );
-		$total_attendees = 0;
-		
-		if ( is_array( $query->posts ) && ! empty( $query->posts ) ) {
-			foreach ( $query->posts as $post_id ) {
-				$attendee_count = (int) get_post_meta( $post_id, 'gatherpress_attendee_count', true );
-				
-				if ( is_numeric( $attendee_count ) ) {
-					$total_attendees += absint( $attendee_count );
-				}
-			}
-		}
-		
-		return absint( $total_attendees );
-	}
-
-	/**
-	 * Get statistic with caching.
-	 *
-	 * @since 0.1.0
-	 *
-	 * @param string               $statistic_type Statistic type to retrieve.
-	 * @param array<string, mixed> $filters        Filters to apply.
-	 * @return int Statistic value.
-	 */
-	public function get_cached( string $statistic_type, array $filters = array() ): int {
-		if ( ! is_string( $statistic_type ) || empty( $statistic_type ) ) {
-			return 0;
-		}
-		
-		if ( ! is_array( $filters ) ) {
-			$filters = array();
-		}
-		
-		if ( ! $this->has_supported_post_types() ) {
-			return 0;
-		}
-		
-		if ( ! $this->is_statistic_type_supported( $statistic_type ) ) {
-			return 0;
-		}
-
-		$expiration = $this->get_cache_expiration();
-
-		$cache_key = $this->get_cache_key( $statistic_type, $filters );
-		
-		$cached = get_transient( $cache_key );
-		
-		if ( false !== $cached && is_numeric( $cached ) ) {
-			return absint( $cached );
-		}
-		
-		$value = $this->calculate( $statistic_type, $filters );
-		
-		$value = is_numeric( $value ) ? absint( $value ) : 0;
-		
-		\set_transient( $cache_key, $value, $expiration );
-		
-		return $value;
-	}
-
-	/**
-	 * Get all common statistic configurations to pre-generate.
-	 *
-	 * @since 0.1.0
-	 *
-	 * @return array<int, array{type: string, filters: array<string, mixed>}> Array of configurations.
-	 */
-	public function get_common_configs(): array {
-		$configs = array();
-		
-		$supported_types = $this->get_supported_statistic_types();
-		
-		if ( empty( $supported_types ) ) {
-			return array();
-		}
-		
-		$event_queries = array( 'upcoming', 'past' );
-		
-		foreach ( $event_queries as $event_query ) {
-			if ( in_array( 'total_events', $supported_types, true ) ) {
-				$configs[] = array(
-					'type'    => 'total_events',
-					'filters' => array( 'event_query' => $event_query ),
-				);
-			}
-		}
-		
-		if ( in_array( 'total_attendees', $supported_types, true ) ) {
-			$configs[] = array(
-				'type'    => 'total_attendees',
-				'filters' => array( 'event_query' => 'past' ),
-			);
-		}
-		
-		$taxonomies = $this->get_filtered_taxonomies();
-		
-		if ( empty( $taxonomies ) || ! is_array( $taxonomies ) ) {
-			return $configs;
-		}
-		
-		foreach ( $taxonomies as $taxonomy ) {
-			if ( ! isset( $taxonomy->name ) ) {
-				continue;
-			}
-			
-			if ( in_array( 'total_taxonomy_terms', $supported_types, true ) ) {
-				$configs[] = array(
-					'type'    => 'total_taxonomy_terms',
-					'filters' => array( 'taxonomy' => $taxonomy->name ),
-				);
-			}
-			
-			$terms = \get_terms(
-				array(
-					'taxonomy'   => $taxonomy->name,
-					'hide_empty' => false,
-				)
-			);
-			
-			if ( ! is_wp_error( $terms ) && is_array( $terms ) && ! empty( $terms ) ) {
-				foreach ( $terms as $term ) {
-					if ( ! isset( $term->term_id ) ) {
-						continue;
-					}
-					
-					foreach ( $event_queries as $event_query ) {
-						$filters = array(
-							'taxonomy'    => $taxonomy->name,
-							'term_id'     => $term->term_id,
-							'event_query' => $event_query,
-						);
-						
-						if ( in_array( 'events_per_taxonomy', $supported_types, true ) ) {
-							$configs[] = array(
-								'type'    => 'events_per_taxonomy',
-								'filters' => $filters,
-							);
-						}
-					}
-					
-					if ( in_array( 'total_attendees', $supported_types, true ) ) {
-						$configs[] = array(
-							'type'    => 'total_attendees',
-							'filters' => array(
-								'taxonomy'    => $taxonomy->name,
-								'term_id'     => $term->term_id,
-								'event_query' => 'past',
-							),
-						);
-					}
-				}
-			}
-		}
-		
-		if ( in_array( 'taxonomy_terms_by_taxonomy', $supported_types, true ) 
-			&& is_array( $taxonomies ) 
-			&& count( $taxonomies ) > 1 ) {
-			$taxonomy_array = array_values( $taxonomies );
-			
-			for ( $i = 0; $i < count( $taxonomy_array ); $i++ ) {
-				for ( $j = 0; $j < count( $taxonomy_array ); $j++ ) {
-					if ( $i !== $j ) {
-						$filter_tax = $taxonomy_array[ $i ];
-						$count_tax  = $taxonomy_array[ $j ];
-						
-						if ( ! isset( $filter_tax->name ) || ! isset( $count_tax->name ) ) {
-							continue;
-						}
-						
-						$terms = \get_terms(
-							array(
-								'taxonomy'   => $filter_tax->name,
-								'hide_empty' => false,
-								'number'     => 10,
-							)
-						);
-						
-						if ( ! is_wp_error( $terms ) && is_array( $terms ) && ! empty( $terms ) ) {
-							foreach ( $terms as $term ) {
-								if ( ! isset( $term->term_id ) ) {
-									continue;
-								}
-								
-								$configs[] = array(
-									'type'    => 'taxonomy_terms_by_taxonomy',
-									'filters' => array(
-										'count_taxonomy'  => $count_tax->name,
-										'filter_taxonomy' => $filter_tax->name,
-										'term_id'         => $term->term_id,
-									),
-								);
-							}
-						}
-					}
-				}
-			}
-		}
-		
-		return $configs;
-	}
-
-	/**
-	 * Pre-generate common statistics after cache clear.
-	 *
-	 * @since 0.1.0
-	 *
-	 * @return void
-	 */
-	public function pregenerate_cache(): void {
-		if ( ! $this->has_supported_post_types() ) {
-			return;
-		}
-		
-		$configs = $this->get_common_configs();
-		
-		if ( ! is_array( $configs ) ) {
-			return;
-		}
-
-		$expiration = $this->get_cache_expiration();
-
 		foreach ( $configs as $config ) {
 			if ( ! isset( $config['type'] ) || ! isset( $config['filters'] ) ) {
 				continue;
 			}
 			
-			$cache_key = $this->get_cache_key(
-				$config['type'],
-				$config['filters']
+			$config['filters']['event_query'] = 'past';
+			
+			$filters_with_date = array_merge( $config['filters'], array(
+				'year'  => $year,
+				'month' => $month,
+			) );
+			
+			$value = Statistics::get_instance()->calculate( $config['type'], $filters_with_date );
+			$filters_hash = md5( wp_json_encode( $config['filters'] ) );
+			
+			$exists = $wpdb->get_var(
+				$wpdb->prepare(
+					"SELECT id FROM {$table_name} 
+					 WHERE statistic_type = %s 
+					 AND statistic_year = %d 
+					 AND statistic_month = %d 
+					 AND filters_hash = %s",
+					$config['type'],
+					$year,
+					$month,
+					$filters_hash
+				)
 			);
-			
-			$value = $this->calculate(
-				$config['type'],
-				$config['filters']
-			);
-			
-			$value = is_numeric( $value ) ? absint( $value ) : 0;
-			
-			\set_transient( $cache_key, $value, $expiration );
-		}
-	}
 
-	/**
-	 * Clear all statistics caches and schedule regeneration.
-	 *
-	 * @since 0.1.0
-	 *
-	 * @global \wpdb $wpdb WordPress database abstraction object.
-	 * @return void
-	 */
-	public function clear_cache(): void {
-		global $wpdb;
-		
-		$wpdb->query(
-			"DELETE FROM {$wpdb->options} 
-			WHERE option_name LIKE '_transient_gatherpress_stats_%' 
-			OR option_name LIKE '_transient_timeout_gatherpress_stats_%'"
-		);
-		
-		$scheduled = wp_next_scheduled( 'gatherpress_statistics_regenerate_cache' );
-		
-		if ( ! $scheduled ) {
-			wp_schedule_single_event(
-				time() + 60,
-				'gatherpress_statistics_regenerate_cache'
-			);
-		}
-	}
+			if ( $exists ) {
+				$result = $wpdb->update(
+					$table_name,
+					array(
+						'statistic_value' => $value,
+						'archived_at'     => $current_time,
+					),
+					array( 'id' => $exists ),
+					array( '%d', '%s' ),
+					array( '%d' )
+				);
+			} else {
+				$result = $wpdb->insert(
+					$table_name,
+					array(
+						'statistic_type'  => $config['type'],
+						'statistic_year'  => $year,
+						'statistic_month' => $month,
+						'filters_hash'    => $filters_hash,
+						'filters_data'    => wp_json_encode( $config['filters'] ),
+						'statistic_value' => $value,
+						'archived_at'     => $current_time,
+					),
+					array( '%s', '%d', '%d', '%s', '%s', '%d', '%s' )
+				);
+			}
 
-	/**
-	 * Check if term changes require cache clearing.
-	 *
-	 * @since 0.1.0
-	 *
-	 * @return bool True if cache should be cleared.
-	 */
-	public function should_clear_cache_for_term_changes(): bool {
-		$supported_types = $this->get_supported_statistic_types();
-		
-		if ( empty( $supported_types ) ) {
-			return false;
-		}
-		
-		$term_dependent_types = array(
-			'events_per_taxonomy',
-			'events_multi_taxonomy',
-			'total_taxonomy_terms',
-			'taxonomy_terms_by_taxonomy',
-		);
-		
-		foreach ( $term_dependent_types as $type ) {
-			if ( in_array( $type, $supported_types, true ) ) {
-				return true;
+			if ( false !== $result ) {
+				$success_count++;
 			}
 		}
-		
-		return false;
+
+		return $success_count > 0;
 	}
 }
+
+// ============================================================================
+// FILE: includes/functions.php
+// ============================================================================
 
 /**
  * Plugin activation hook.
@@ -2116,7 +2565,7 @@ class Plugin {
  * @return void
  */
 function activate_plugin(): void {
-	Plugin::get_instance()->create_archive_table();
+	Database::get_instance()->create_archive_table();
 	
 	if ( ! wp_next_scheduled( 'gatherpress_statistics_regenerate_cache' ) ) {
 		wp_schedule_single_event(
@@ -2174,7 +2623,7 @@ register_deactivation_hook( __FILE__, __NAMESPACE__ . '\deactivate_plugin' );
  * @return int Statistic value.
  */
 function get_cached( string $statistic_type, array $filters = array() ): int {
-	return Plugin::get_instance()->get_cached( $statistic_type, $filters );
+	return Cache::get_instance()->get_cached( $statistic_type, $filters );
 }
 
 /**
@@ -2185,7 +2634,7 @@ function get_cached( string $statistic_type, array $filters = array() ): int {
  * @return void
  */
 function clear_cache(): void {
-	Plugin::get_instance()->clear_cache();
+	Cache::get_instance()->clear_cache();
 }
 
 /**
@@ -2196,7 +2645,7 @@ function clear_cache(): void {
  * @return void
  */
 function pregenerate_cache(): void {
-	Plugin::get_instance()->pregenerate_cache();
+	Cache::get_instance()->pregenerate_cache();
 }
 
 // Initialize the plugin
