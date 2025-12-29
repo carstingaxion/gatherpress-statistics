@@ -74,6 +74,7 @@ class Plugin {
 		add_action( 'init', array( $this, 'create_archive_table' ) );
 		add_action( 'rest_api_init', array( $this, 'register_rest_routes' ) );
 		add_action( 'admin_menu', array( $this, 'register_admin_page' ) );
+		add_action( 'admin_init', array( $this, 'handle_manual_archive_generation' ) );
 		add_action( 'gatherpress_statistics_regenerate_cache', array( $this, 'pregenerate_cache' ) );
 		add_action( 'gatherpress_statistics_monthly_archive', array( $this, 'archive_monthly_statistics' ) );
 		add_action( 'transition_post_status', array( $this, 'clear_cache_on_status_change' ), 10, 3 );
@@ -84,6 +85,7 @@ class Plugin {
 		add_action( 'edit_term', array( $this, 'clear_cache_on_term_change' ), 10, 3 );
 		add_action( 'delete_term', array( $this, 'clear_cache_on_term_change' ), 10, 3 );
 		add_action( 'set_object_terms', array( $this, 'clear_cache_on_term_relationship' ), 10, 3 );
+		add_filter( 'posts_where', array( $this, 'filter_gatherpress_event_dates' ), 10, 2 );
 	}
 
 	/**
@@ -171,6 +173,175 @@ class Plugin {
 	}
 
 	/**
+	 * Handle manual archive generation form submission.
+	 *
+	 * @since 0.1.0
+	 *
+	 * @return void
+	 */
+	public function handle_manual_archive_generation(): void {
+		if ( ! isset( $_POST['gatherpress_generate_archive'] ) ) {
+			return;
+		}
+
+		if ( ! isset( $_POST['gatherpress_archive_nonce'] ) || 
+		     ! wp_verify_nonce( $_POST['gatherpress_archive_nonce'], 'gatherpress_generate_archive' ) ) {
+			return;
+		}
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+
+		$year = isset( $_POST['archive_year'] ) ? absint( $_POST['archive_year'] ) : 0;
+		$month = isset( $_POST['archive_month'] ) ? absint( $_POST['archive_month'] ) : 0;
+
+		if ( ! $year || ! $month || $month < 1 || $month > 12 ) {
+			add_settings_error(
+				'gatherpress_statistics',
+				'invalid_date',
+				__( 'Invalid year or month selected.', 'gatherpress-statistics' ),
+				'error'
+			);
+			return;
+		}
+
+		// Generate statistics for the specified month
+		$result = $this->archive_statistics_for_month( $year, $month );
+
+		if ( $result ) {
+			add_settings_error(
+				'gatherpress_statistics',
+				'archive_generated',
+				__( 'Archive statistics generated successfully.', 'gatherpress-statistics' ),
+				'success'
+			);
+		} else {
+			add_settings_error(
+				'gatherpress_statistics',
+				'archive_failed',
+				__( 'Failed to generate archive statistics.', 'gatherpress-statistics' ),
+				'error'
+			);
+		}
+	}
+
+	/**
+	 * Generate archive statistics for a specific month.
+	 *
+	 * @since 0.1.0
+	 *
+	 * @global \wpdb $wpdb WordPress database abstraction object.
+	 * @param int $year  Year to generate statistics for.
+	 * @param int $month Month to generate statistics for.
+	 * @return bool True on success, false on failure.
+	 */
+	public function archive_statistics_for_month( int $year, int $month ): bool {
+		global $wpdb;
+		
+		$table_name = $wpdb->prefix . 'gatherpress_statistics_archive';
+		$current_time = current_time( 'mysql' );
+		
+		// Get all common configs
+		$configs = $this->get_common_configs();
+		
+		if ( empty( $configs ) ) {
+			return false;
+		}
+
+		$success_count = 0;
+		
+		foreach ( $configs as $config ) {
+			if ( ! isset( $config['type'] ) || ! isset( $config['filters'] ) ) {
+				continue;
+			}
+			
+			// CRITICAL: For statistical purposes, always set event_query to 'past'
+			$config['filters']['event_query'] = 'past';
+			
+			// Add year and month to filters for calculation
+			$filters_with_date = array_merge( $config['filters'], array(
+				'year'  => $year,
+				'month' => $month,
+			) );
+			
+			$value = $this->calculate( $config['type'], $filters_with_date );
+			$filters_hash = md5( wp_json_encode( $config['filters'] ) );
+			
+			// Check if this exact statistic already exists
+			$exists = $wpdb->get_var(
+				$wpdb->prepare(
+					"SELECT id FROM {$table_name} 
+					 WHERE statistic_type = %s 
+					 AND statistic_year = %d 
+					 AND statistic_month = %d 
+					 AND filters_hash = %s",
+					$config['type'],
+					$year,
+					$month,
+					$filters_hash
+				)
+			);
+
+			if ( $exists ) {
+				// Update existing record
+				$result = $wpdb->update(
+					$table_name,
+					array(
+						'statistic_value' => $value,
+						'archived_at'     => $current_time,
+					),
+					array( 'id' => $exists ),
+					array( '%d', '%s' ),
+					array( '%d' )
+				);
+			} else {
+				// Insert new record
+				$result = $wpdb->insert(
+					$table_name,
+					array(
+						'statistic_type'  => $config['type'],
+						'statistic_year'  => $year,
+						'statistic_month' => $month,
+						'filters_hash'    => $filters_hash,
+						'filters_data'    => wp_json_encode( $config['filters'] ),
+						'statistic_value' => $value,
+						'archived_at'     => $current_time,
+					),
+					array( '%s', '%d', '%d', '%s', '%s', '%d', '%s' )
+				);
+			}
+
+			if ( false !== $result ) {
+				$success_count++;
+			}
+		}
+
+		return $success_count > 0;
+	}
+
+	/**
+	 * Get human-readable label for statistic type.
+	 *
+	 * @since 0.1.0
+	 *
+	 * @param string $type Statistic type slug.
+	 * @return string Human-readable label.
+	 */
+	public function get_statistic_type_label( string $type ): string {
+		$labels = array(
+			'total_events'                => __( 'Total Events', 'gatherpress-statistics' ),
+			'events_per_taxonomy'         => __( 'Events per Taxonomy', 'gatherpress-statistics' ),
+			'events_multi_taxonomy'       => __( 'Events (Multiple Taxonomies)', 'gatherpress-statistics' ),
+			'total_taxonomy_terms'        => __( 'Total Taxonomy Terms', 'gatherpress-statistics' ),
+			'taxonomy_terms_by_taxonomy'  => __( 'Taxonomy Terms by Taxonomy', 'gatherpress-statistics' ),
+			'total_attendees'             => __( 'Total Attendees', 'gatherpress-statistics' ),
+		);
+
+		return isset( $labels[ $type ] ) ? $labels[ $type ] : ucwords( str_replace( '_', ' ', $type ) );
+	}
+
+	/**
 	 * Render admin page.
 	 *
 	 * @since 0.1.0
@@ -186,17 +357,39 @@ class Plugin {
 		// Get filter parameters
 		$selected_year = isset( $_GET['year'] ) ? absint( $_GET['year'] ) : null;
 		$selected_month = isset( $_GET['month'] ) ? absint( $_GET['month'] ) : null;
-		$selected_type = isset( $_GET['type'] ) ? sanitize_text_field( $_GET['type'] ) : null;
+		$selected_taxonomy = isset( $_GET['taxonomy'] ) ? sanitize_text_field( $_GET['taxonomy'] ) : null;
+		$selected_term = isset( $_GET['term_id'] ) ? absint( $_GET['term_id'] ) : null;
+		$selected_type = isset( $_GET['stat_type'] ) ? sanitize_text_field( $_GET['stat_type'] ) : '';
+		$current_tab = isset( $_GET['tab'] ) ? sanitize_text_field( $_GET['tab'] ) : 'all';
+		$order_by = isset( $_GET['orderby'] ) ? sanitize_text_field( $_GET['orderby'] ) : 'statistic_year';
+		$order = isset( $_GET['order'] ) && $_GET['order'] === 'asc' ? 'ASC' : 'DESC';
+		
+		// Get supported statistic types for tabs
+		$supported_types = $this->get_supported_statistic_types();
 		
 		// Get available years
 		$years = $wpdb->get_col( "SELECT DISTINCT statistic_year FROM {$table_name} ORDER BY statistic_year DESC" );
 		
-		// Get available types
-		$types = $wpdb->get_col( "SELECT DISTINCT statistic_type FROM {$table_name} ORDER BY statistic_type" );
+		// Get available taxonomies from filters_data
+		$taxonomies = array();
+		$all_filters = $wpdb->get_col( "SELECT DISTINCT filters_data FROM {$table_name}" );
+		foreach ( $all_filters as $filters_json ) {
+			$filters = json_decode( $filters_json, true );
+			if ( isset( $filters['taxonomy'] ) && ! in_array( $filters['taxonomy'], $taxonomies, true ) ) {
+				$taxonomies[] = $filters['taxonomy'];
+			}
+		}
+		sort( $taxonomies );
 		
-		// Build query
+		// Build base query
 		$where_clauses = array();
 		$query_params = array();
+		
+		// Filter by tab (statistic type)
+		if ( 'all' !== $current_tab && ! empty( $current_tab ) ) {
+			$where_clauses[] = 'statistic_type = %s';
+			$query_params[] = $current_tab;
+		}
 		
 		if ( $selected_year ) {
 			$where_clauses[] = 'statistic_year = %d';
@@ -208,15 +401,33 @@ class Plugin {
 			$query_params[] = $selected_month;
 		}
 		
-		if ( $selected_type ) {
-			$where_clauses[] = 'statistic_type = %s';
-			$query_params[] = $selected_type;
+		// Filter by taxonomy or term in filters_data
+		if ( $selected_taxonomy || $selected_term ) {
+			$json_conditions = array();
+			if ( $selected_taxonomy ) {
+				$json_conditions[] = "filters_data LIKE '%\"taxonomy\":\"" . $wpdb->esc_like( $selected_taxonomy ) . "\"%'";
+			}
+			if ( $selected_term ) {
+				$json_conditions[] = "filters_data LIKE '%\"term_id\":{$selected_term}%'";
+			}
+			if ( ! empty( $json_conditions ) ) {
+				$where_clauses[] = '(' . implode( ' AND ', $json_conditions ) . ')';
+			}
 		}
 		
 		$where_sql = ! empty( $where_clauses ) ? 'WHERE ' . implode( ' AND ', $where_clauses ) : '';
 		
+		// Validate order_by
+		$allowed_order_by = array( 'statistic_year', 'statistic_month', 'statistic_value', 'archived_at' );
+		if ( ! in_array( $order_by, $allowed_order_by, true ) ) {
+			$order_by = 'statistic_year';
+		}
+		
+		// Build order clause with secondary sorting
+		$order_clause = "ORDER BY {$order_by} {$order}, statistic_month {$order}";
+		
 		// Get statistics
-		$query = "SELECT * FROM {$table_name} {$where_sql} ORDER BY statistic_year DESC, statistic_month DESC, statistic_type";
+		$query = "SELECT * FROM {$table_name} {$where_sql} {$order_clause}";
 		
 		if ( ! empty( $query_params ) ) {
 			$query = $wpdb->prepare( $query, $query_params );
@@ -224,14 +435,94 @@ class Plugin {
 		
 		$statistics = $wpdb->get_results( $query );
 		
+		// Get current year and month for generation form
+		$current_year = (int) date( 'Y' );
+		$current_month = (int) date( 'n' );
+		
+		// Build URL for sorting and filtering
+		$base_url = add_query_arg( array(
+			'page' => 'gatherpress-statistics-archive',
+			'tab' => $current_tab,
+			'year' => $selected_year,
+			'month' => $selected_month,
+			'taxonomy' => $selected_taxonomy,
+			'term_id' => $selected_term,
+		), admin_url( 'index.php' ) );
+		
+		// Toggle order direction
+		$next_order = ( $order === 'ASC' ) ? 'desc' : 'asc';
+		
 		// Render page
 		?>
 		<div class="wrap">
 			<h1><?php echo esc_html( get_admin_page_title() ); ?></h1>
 			
+			<?php settings_errors( 'gatherpress_statistics' ); ?>
+			
+			<div class="card">
+				<h2><?php esc_html_e( 'Generate Archive Statistics', 'gatherpress-statistics' ); ?></h2>
+				<p><?php esc_html_e( 'Manually generate archive statistics for a specific month. This will calculate all configured statistics and store them in the archive.', 'gatherpress-statistics' ); ?></p>
+				
+				<form method="post" action="">
+					<?php wp_nonce_field( 'gatherpress_generate_archive', 'gatherpress_archive_nonce' ); ?>
+					
+					<table class="form-table">
+						<tr>
+							<th scope="row">
+								<label for="archive_year"><?php esc_html_e( 'Year', 'gatherpress-statistics' ); ?></label>
+							</th>
+							<td>
+								<select name="archive_year" id="archive_year" required>
+									<?php for ( $y = $current_year; $y >= 2020; $y-- ) : ?>
+										<option value="<?php echo esc_attr( $y ); ?>"><?php echo esc_html( $y ); ?></option>
+									<?php endfor; ?>
+								</select>
+							</td>
+						</tr>
+						<tr>
+							<th scope="row">
+								<label for="archive_month"><?php esc_html_e( 'Month', 'gatherpress-statistics' ); ?></label>
+							</th>
+							<td>
+								<select name="archive_month" id="archive_month" required>
+									<?php for ( $m = 1; $m <= 12; $m++ ) : ?>
+										<option value="<?php echo esc_attr( $m ); ?>" <?php selected( $m, $current_month ); ?>>
+											<?php echo esc_html( date_i18n( 'F', mktime( 0, 0, 0, $m, 1 ) ) ); ?>
+										</option>
+									<?php endfor; ?>
+								</select>
+							</td>
+						</tr>
+					</table>
+					
+					<p class="submit">
+						<input type="submit" name="gatherpress_generate_archive" class="button button-primary" value="<?php esc_attr_e( 'Generate Archive', 'gatherpress-statistics' ); ?>" />
+					</p>
+				</form>
+			</div>
+			
+			<hr />
+			
+			<h2><?php esc_html_e( 'Archived Statistics', 'gatherpress-statistics' ); ?></h2>
+			
+			<!-- Tabs for statistic types -->
+			<h2 class="nav-tab-wrapper">
+				<a href="<?php echo esc_url( add_query_arg( 'tab', 'all', remove_query_arg( array( 'orderby', 'order' ), $base_url ) ) ); ?>" 
+				   class="nav-tab <?php echo 'all' === $current_tab ? 'nav-tab-active' : ''; ?>">
+					<?php esc_html_e( 'All Statistics', 'gatherpress-statistics' ); ?>
+				</a>
+				<?php foreach ( $supported_types as $type ) : ?>
+					<a href="<?php echo esc_url( add_query_arg( 'tab', $type, remove_query_arg( array( 'orderby', 'order' ), $base_url ) ) ); ?>" 
+					   class="nav-tab <?php echo $type === $current_tab ? 'nav-tab-active' : ''; ?>">
+						<?php echo esc_html( $this->get_statistic_type_label( $type ) ); ?>
+					</a>
+				<?php endforeach; ?>
+			</h2>
+			
 			<div class="tablenav top">
 				<form method="get">
 					<input type="hidden" name="page" value="gatherpress-statistics-archive" />
+					<input type="hidden" name="tab" value="<?php echo esc_attr( $current_tab ); ?>" />
 					
 					<select name="year">
 						<option value=""><?php esc_html_e( 'All Years', 'gatherpress-statistics' ); ?></option>
@@ -251,14 +542,36 @@ class Plugin {
 						<?php endfor; ?>
 					</select>
 					
-					<select name="type">
-						<option value=""><?php esc_html_e( 'All Types', 'gatherpress-statistics' ); ?></option>
-						<?php foreach ( $types as $type ) : ?>
-							<option value="<?php echo esc_attr( $type ); ?>" <?php selected( $selected_type, $type ); ?>>
-								<?php echo esc_html( ucwords( str_replace( '_', ' ', $type ) ) ); ?>
+					<select name="taxonomy">
+						<option value=""><?php esc_html_e( 'All Taxonomies', 'gatherpress-statistics' ); ?></option>
+						<?php foreach ( $taxonomies as $tax_slug ) : 
+							$tax_obj = get_taxonomy( $tax_slug );
+							if ( $tax_obj ) :
+						?>
+							<option value="<?php echo esc_attr( $tax_slug ); ?>" <?php selected( $selected_taxonomy, $tax_slug ); ?>>
+								<?php echo esc_html( $tax_obj->labels->name ); ?>
 							</option>
+							<?php endif; ?>
 						<?php endforeach; ?>
 					</select>
+					
+					<?php if ( $selected_taxonomy ) : 
+						$terms = get_terms( array(
+							'taxonomy' => $selected_taxonomy,
+							'hide_empty' => false,
+						) );
+						if ( ! empty( $terms ) && ! is_wp_error( $terms ) ) :
+					?>
+						<select name="term_id">
+							<option value=""><?php esc_html_e( 'All Terms', 'gatherpress-statistics' ); ?></option>
+							<?php foreach ( $terms as $term ) : ?>
+								<option value="<?php echo esc_attr( $term->term_id ); ?>" <?php selected( $selected_term, $term->term_id ); ?>>
+									<?php echo esc_html( $term->name ); ?>
+								</option>
+							<?php endforeach; ?>
+						</select>
+						<?php endif; ?>
+					<?php endif; ?>
 					
 					<input type="submit" class="button" value="<?php esc_attr_e( 'Filter', 'gatherpress-statistics' ); ?>" />
 				</form>
@@ -270,20 +583,74 @@ class Plugin {
 				<table class="wp-list-table widefat fixed striped">
 					<thead>
 						<tr>
-							<th><?php esc_html_e( 'Year', 'gatherpress-statistics' ); ?></th>
-							<th><?php esc_html_e( 'Month', 'gatherpress-statistics' ); ?></th>
-							<th><?php esc_html_e( 'Type', 'gatherpress-statistics' ); ?></th>
-							<th><?php esc_html_e( 'Value', 'gatherpress-statistics' ); ?></th>
-							<th><?php esc_html_e( 'Archived', 'gatherpress-statistics' ); ?></th>
+							<th>
+								<a href="<?php echo esc_url( add_query_arg( array( 'orderby' => 'statistic_year', 'order' => $next_order ), $base_url ) ); ?>">
+									<?php esc_html_e( 'Year', 'gatherpress-statistics' ); ?>
+									<?php if ( $order_by === 'statistic_year' ) : ?>
+										<span class="dashicons dashicons-arrow-<?php echo $order === 'ASC' ? 'up' : 'down'; ?>"></span>
+									<?php endif; ?>
+								</a>
+							</th>
+							<th>
+								<a href="<?php echo esc_url( add_query_arg( array( 'orderby' => 'statistic_month', 'order' => $next_order ), $base_url ) ); ?>">
+									<?php esc_html_e( 'Month', 'gatherpress-statistics' ); ?>
+									<?php if ( $order_by === 'statistic_month' ) : ?>
+										<span class="dashicons dashicons-arrow-<?php echo $order === 'ASC' ? 'up' : 'down'; ?>"></span>
+									<?php endif; ?>
+								</a>
+							</th>
+							<?php if ( 'all' === $current_tab ) : ?>
+								<th><?php esc_html_e( 'Statistic Type', 'gatherpress-statistics' ); ?></th>
+							<?php endif; ?>
+							<th><?php esc_html_e( 'Taxonomy', 'gatherpress-statistics' ); ?></th>
+							<th><?php esc_html_e( 'Term', 'gatherpress-statistics' ); ?></th>
+							<th>
+								<a href="<?php echo esc_url( add_query_arg( array( 'orderby' => 'statistic_value', 'order' => $next_order ), $base_url ) ); ?>">
+									<?php esc_html_e( 'Value', 'gatherpress-statistics' ); ?>
+									<?php if ( $order_by === 'statistic_value' ) : ?>
+										<span class="dashicons dashicons-arrow-<?php echo $order === 'ASC' ? 'up' : 'down'; ?>"></span>
+									<?php endif; ?>
+								</a>
+							</th>
+							<th>
+								<a href="<?php echo esc_url( add_query_arg( array( 'orderby' => 'archived_at', 'order' => $next_order ), $base_url ) ); ?>">
+									<?php esc_html_e( 'Archived', 'gatherpress-statistics' ); ?>
+									<?php if ( $order_by === 'archived_at' ) : ?>
+										<span class="dashicons dashicons-arrow-<?php echo $order === 'ASC' ? 'up' : 'down'; ?>"></span>
+									<?php endif; ?>
+								</a>
+							</th>
 						</tr>
 					</thead>
 					<tbody>
-						<?php foreach ( $statistics as $stat ) : ?>
+						<?php foreach ( $statistics as $stat ) : 
+							$filters = json_decode( $stat->filters_data, true );
+							$taxonomy_name = '';
+							$term_name = '';
+							
+							if ( isset( $filters['taxonomy'] ) ) {
+								$tax_obj = get_taxonomy( $filters['taxonomy'] );
+								if ( $tax_obj ) {
+									$taxonomy_name = $tax_obj->labels->singular_name;
+								}
+							}
+							
+							if ( isset( $filters['term_id'] ) ) {
+								$term = get_term( $filters['term_id'] );
+								if ( $term && ! is_wp_error( $term ) ) {
+									$term_name = $term->name;
+								}
+							}
+						?>
 							<tr>
 								<td><?php echo esc_html( $stat->statistic_year ); ?></td>
 								<td><?php echo esc_html( date_i18n( 'F', mktime( 0, 0, 0, $stat->statistic_month, 1 ) ) ); ?></td>
-								<td><?php echo esc_html( ucwords( str_replace( '_', ' ', $stat->statistic_type ) ) ); ?></td>
-								<td><?php echo esc_html( number_format_i18n( $stat->statistic_value ) ); ?></td>
+								<?php if ( 'all' === $current_tab ) : ?>
+									<td><?php echo esc_html( $this->get_statistic_type_label( $stat->statistic_type ) ); ?></td>
+								<?php endif; ?>
+								<td><?php echo esc_html( $taxonomy_name ); ?></td>
+								<td><?php echo esc_html( $term_name ); ?></td>
+								<td><strong><?php echo esc_html( number_format_i18n( $stat->statistic_value ) ); ?></strong></td>
 								<td><?php echo esc_html( date_i18n( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), strtotime( $stat->archived_at ) ) ); ?></td>
 							</tr>
 						<?php endforeach; ?>
@@ -299,42 +666,13 @@ class Plugin {
 	 *
 	 * @since 0.1.0
 	 *
-	 * @global \wpdb $wpdb WordPress database abstraction object.
 	 * @return void
 	 */
 	public function archive_monthly_statistics(): void {
-		global $wpdb;
-		
-		$table_name = $wpdb->prefix . 'gatherpress_statistics_archive';
-		$current_time = current_time( 'mysql' );
 		$current_year = (int) date( 'Y' );
 		$current_month = (int) date( 'n' );
 		
-		// Get all common configs
-		$configs = $this->get_common_configs();
-		
-		foreach ( $configs as $config ) {
-			if ( ! isset( $config['type'] ) || ! isset( $config['filters'] ) ) {
-				continue;
-			}
-			
-			$value = $this->calculate( $config['type'], $config['filters'] );
-			$filters_hash = md5( wp_json_encode( $config['filters'] ) );
-			
-			$wpdb->insert(
-				$table_name,
-				array(
-					'statistic_type'  => $config['type'],
-					'statistic_year'  => $current_year,
-					'statistic_month' => $current_month,
-					'filters_hash'    => $filters_hash,
-					'filters_data'    => wp_json_encode( $config['filters'] ),
-					'statistic_value' => $value,
-					'archived_at'     => $current_time,
-				),
-				array( '%s', '%d', '%d', '%s', '%s', '%d', '%s' )
-			);
-		}
+		$this->archive_statistics_for_month( $current_year, $current_month );
 	}
 
 	/**
@@ -447,7 +785,7 @@ class Plugin {
 	 * @return void
 	 */
 	public function clear_cache_on_meta_update( int $meta_id, int $post_id, string $meta_key ): void {
-		if ( 'gatherpress_attendees_count' === $meta_key && $this->is_supported_post( $post_id ) ) {
+		if ( 'gatherpress_attendee_count' === $meta_key && $this->is_supported_post( $post_id ) ) {
 			$this->clear_cache();
 		}
 	}
@@ -463,7 +801,7 @@ class Plugin {
 	 * @return void
 	 */
 	public function clear_cache_on_meta_delete( $meta_ids, int $post_id, string $meta_key ): void {
-		if ( 'gatherpress_attendees_count' === $meta_key && $this->is_supported_post( $post_id ) ) {
+		if ( 'gatherpress_attendee_count' === $meta_key && $this->is_supported_post( $post_id ) ) {
 			$this->clear_cache();
 		}
 	}
@@ -515,6 +853,93 @@ class Plugin {
 		if ( $this->is_supported_post( $object_id ) ) {
 			$this->clear_cache();
 		}
+	}
+
+	/**
+	 * Filter SQL WHERE clause to use GatherPress event dates instead of post dates.
+	 *
+	 * This filter intercepts queries for gatherpress_event posts that have both
+	 * the 'gatherpress_event_query' parameter and a date_query defined. It removes
+	 * the WordPress post date filtering and replaces it with GatherPress event date
+	 * filtering from the gatherpress_events table.
+	 *
+	 * @since 0.1.0
+	 *
+	 * @global \wpdb $wpdb WordPress database abstraction object.
+	 * @param string    $where The WHERE clause of the query.
+	 * @param \WP_Query $query The WP_Query instance.
+	 * @return string Modified WHERE clause.
+	 */
+	public function filter_gatherpress_event_dates( string $where, \WP_Query $query ): string {
+		global $wpdb;
+
+		// // Only apply to queries with gatherpress_event_query parameter
+		// if ( ! isset( $query->query_vars['gatherpress_event_query'] ) ) {
+		// 	return $where;
+		// }
+
+		// Only apply if date_query is set
+		if ( empty( $query->query_vars['date_query'] ) ) {
+			return $where;
+		}
+
+		// Only apply to gatherpress_event post type
+		$post_type = $query->get( 'post_type' );
+		if ( 'gatherpress_event' !== $post_type && ! in_array( 'gatherpress_event', (array) $post_type, true ) ) {
+			return $where;
+		}
+// error_log( 'filter_gatherpress_event_dates applied' );
+// error_log( 'WHERE before: ' . $where );
+// error_log( 'query_vars: ' . var_export( $query->query_vars, true ) );
+
+		$date_query = $query->query_vars['date_query'];
+		if ( ! is_array( $date_query ) || empty( $date_query ) ) {
+			return $where;
+		}
+
+		// Get the first date_query element (our year/month filter)
+		$date_filter = is_array( $date_query[0] ) ? $date_query[0] : array();
+
+		// Build the date conditions for GatherPress events table
+		$date_conditions = array();
+
+		if ( ! empty( $date_filter['year'] ) ) {
+			$year = absint( $date_filter['year'] );
+			$date_conditions[] = $wpdb->prepare( 'YEAR(ge.datetime_start_gmt) = %d', $year );
+		}
+
+		if ( ! empty( $date_filter['month'] ) ) {
+			$month = absint( $date_filter['month'] );
+			$date_conditions[] = $wpdb->prepare( 'MONTH(ge.datetime_start_gmt) = %d', $month );
+		}
+
+		// Only proceed if we have date conditions to add
+		if ( empty( $date_conditions ) ) {
+			return $where;
+		}
+
+		// Remove the WordPress post_date filtering that was added by date_query
+		// This regex removes the entire date_query WHERE clause
+		$where = preg_replace(
+			// '/AND\s+\(\s*\(\s*YEAR\([^)]+\)[^)]+\)\s*(?:AND\s*\(\s*MONTH\([^)]+\)[^)]+\)\s*)?\)/',
+			'/AND\s*\(\s*\(\s*YEAR\(\s*[^)]+\s*\)\s*=\s*\d+(?:\s+AND\s+MONTH\(\s*[^)]+\s*\)\s*=\s*\d+)?\s*\)\s*\)/',
+			'',
+			$where
+		);
+
+		// Add JOIN to gatherpress_events table (if not already present)
+		// Note: We can't add JOINs here, so we'll use a subquery approach instead
+		$events_table = $wpdb->prefix . 'gatherpress_events';
+		$date_where = implode( ' AND ', $date_conditions );
+
+		// Add our GatherPress event date filter using a subquery
+		$where .= " AND {$wpdb->posts}.ID IN (
+			SELECT ge.post_id 
+			FROM {$events_table} ge 
+			WHERE {$date_where}
+		)";
+// error_log( 'WHERE after: ' . $where );
+		return $where;
 	}
 
 	/**
@@ -773,7 +1198,7 @@ class Plugin {
 		if ( ! $this->is_statistic_type_supported( $statistic_type ) ) {
 			return 0;
 		}
-		
+
 		$statistic_type = is_string( $statistic_type ) ? $statistic_type : 'total_events';
 		$filters = is_array( $filters ) ? $filters : array();
 		
@@ -815,6 +1240,34 @@ class Plugin {
 	}
 
 	/**
+	 * Build date query arguments from filters.
+	 *
+	 * @since 0.1.0
+	 *
+	 * @param array<string, mixed> $filters Query filters.
+	 * @return array<string, mixed> Date query arguments.
+	 */
+	private function build_date_query( array $filters ): array {
+		$date_query = array();
+		
+		if ( ! empty( $filters['year'] ) ) {
+			$year = absint( $filters['year'] );
+			if ( $year > 0 ) {
+				$date_query['year'] = $year;
+			}
+		}
+		
+		if ( ! empty( $filters['month'] ) ) {
+			$month = absint( $filters['month'] );
+			if ( $month >= 1 && $month <= 12 ) {
+				$date_query['month'] = $month;
+			}
+		}
+		
+		return $date_query;
+	}
+
+	/**
 	 * Count events with filters.
 	 *
 	 * @since 0.1.0
@@ -845,6 +1298,12 @@ class Plugin {
 			}
 		}
 		
+		// Add date query for year/month filtering
+		$date_query = $this->build_date_query( $filters );
+		if ( ! empty( $date_query ) ) {
+			$args['date_query'] = array( $date_query );
+		}
+		
 		if ( ! empty( $filters['taxonomy'] ) && ! empty( $filters['term_id'] ) ) {
 			if ( taxonomy_exists( $filters['taxonomy'] ) ) {
 				$args['tax_query'] = array(
@@ -873,8 +1332,11 @@ class Plugin {
 				$args['tax_query'] = $tax_query;
 			}
 		}
-		
+		// error_log( 'Count Events Args: ' . print_r( $args, true ) );
 		$query = new \WP_Query( $args );
+		// error_log( 'Count Events Found Posts: ' . print_r( $query->found_posts, true ) );
+		// error_log( 'Count Events Found Posts: ' . var_export( $query, true ) );
+		// error_log( 'Found Posts: ' . var_export( wp_list_pluck( $query->posts, 'post_title'), true ) );
 		
 		return absint( $query->found_posts );
 	}
@@ -907,14 +1369,20 @@ class Plugin {
 			'object_ids' => null,
 		);
 		
-		$post_query = new \WP_Query(
-			array(
-				'post_type'      => $post_types,
-				'post_status'    => 'publish',
-				'posts_per_page' => -1,
-				'fields'         => 'ids',
-			)
+		$query_args = array(
+			'post_type'      => $post_types,
+			'post_status'    => 'publish',
+			'posts_per_page' => -1,
+			'fields'         => 'ids',
 		);
+		
+		// Add date query for year/month filtering
+		$date_query = $this->build_date_query( $filters );
+		if ( ! empty( $date_query ) ) {
+			$query_args['date_query'] = array( $date_query );
+		}
+		
+		$post_query = new \WP_Query( $query_args );
 		
 		if ( ! empty( $post_query->posts ) ) {
 			$args['object_ids'] = $post_query->posts;
@@ -972,6 +1440,12 @@ class Plugin {
 			),
 		);
 		
+		// Add date query for year/month filtering
+		$date_query = $this->build_date_query( $filters );
+		if ( ! empty( $date_query ) ) {
+			$args['date_query'] = array( $date_query );
+		}
+		
 		$query = new \WP_Query( $args );
 		$terms = array();
 		
@@ -1018,6 +1492,12 @@ class Plugin {
 			}
 		}
 		
+		// Add date query for year/month filtering
+		$date_query = $this->build_date_query( $filters );
+		if ( ! empty( $date_query ) ) {
+			$args['date_query'] = array( $date_query );
+		}
+		
 		if ( ! empty( $filters['taxonomy'] ) && ! empty( $filters['term_id'] ) ) {
 			if ( taxonomy_exists( $filters['taxonomy'] ) ) {
 				$args['tax_query'] = array(
@@ -1052,7 +1532,7 @@ class Plugin {
 		
 		if ( is_array( $query->posts ) && ! empty( $query->posts ) ) {
 			foreach ( $query->posts as $post_id ) {
-				$attendee_count = (int) get_post_meta( $post_id, 'gatherpress_attendees_count', true );
+				$attendee_count = (int) get_post_meta( $post_id, 'gatherpress_attendee_count', true );
 				
 				if ( is_numeric( $attendee_count ) ) {
 					$total_attendees += absint( $attendee_count );
