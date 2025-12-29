@@ -122,19 +122,21 @@ class Plugin {
 		$table_name = $wpdb->prefix . 'gatherpress_statistics_archive';
 		$charset_collate = $wpdb->get_charset_collate();
 		
-		$sql = "CREATE TABLE IF NOT EXISTS {$table_name} (
-			id bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT,
-			statistic_type varchar(100) NOT NULL,
-			statistic_year year(4) NOT NULL,
-			statistic_month tinyint(2) NOT NULL,
-			filters_hash varchar(32) NOT NULL,
-			filters_data longtext NOT NULL,
-			statistic_value bigint(20) NOT NULL DEFAULT 0,
-			archived_at datetime NOT NULL,
-			PRIMARY KEY  (id),
-			KEY statistic_lookup (statistic_type, statistic_year, statistic_month),
-			KEY filters_lookup (filters_hash)
-		) {$charset_collate};";
+		$sql = 
+				"CREATE TABLE {$table_name} (
+				id mediumint(10) UNSIGNED NOT NULL AUTO_INCREMENT,
+				statistic_type varchar(100) NOT NULL,
+				statistic_year smallint UNSIGNED NOT NULL,
+				statistic_month tinyint UNSIGNED NOT NULL,
+				filters_hash char(32) NOT NULL,
+				filters_data longtext NOT NULL,
+				statistic_value bigint(20) NOT NULL DEFAULT 0,
+				archived_at datetime NULL DEFAULT NULL,
+				PRIMARY KEY  (id),
+				KEY statistic_lookup (statistic_type, statistic_year, statistic_month),
+				KEY statistic_year_month (statistic_year, statistic_month),
+				KEY filters_lookup (filters_hash)
+				) {$charset_collate};";
 		
 		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 		dbDelta( $sql );
