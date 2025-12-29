@@ -643,7 +643,11 @@ class Plugin {
 								},
 								scales: {
 									y: {
-										beginAtZero: true
+										beginAtZero: true,
+										ticks: {
+											precision: 0,
+											stepSize: 1
+										}
 									}
 								}
 							}
