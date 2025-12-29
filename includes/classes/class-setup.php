@@ -95,7 +95,6 @@ class Setup {
 		 * @param array<string, bool> $config Configuration array with statistic type keys and boolean values.
 		 */
 		$config = apply_filters( 'gatherpress_statistics_support_config', $default_config );
-		
 		add_post_type_support( 'gatherpress_event', 'gatherpress_statistics', $config );
 	}
 
@@ -224,9 +223,9 @@ class Setup {
 		}
 		
 		// Only clear cache if status is changing to or from 'publish'
-		// This catches: publish→anything or anything→publish
+		// This catches: publish→anything or anything→publish.
 		if ( 'publish' === $new_status || 'publish' === $old_status ) {
-			// Only clear if status actually changed
+			// Only clear if status actually changed.
 			if ( $new_status !== $old_status ) {
 				$this->clear_cache();
 			}
@@ -296,19 +295,19 @@ class Setup {
 	 * @return void
 	 */
 	public function clear_cache_on_term_change( int $term_id, int $tt_id, string $taxonomy ): void {
-		// First check if any term-dependent statistic types are supported
+		// First check if any term-dependent statistic types are supported.
 		if ( ! $this->should_clear_cache_for_term_changes() ) {
 			return;
 		}
 		
-		// Get filtered taxonomies (excludes any taxonomies filtered out)
+		// Get filtered taxonomies (excludes any taxonomies filtered out).
 		$supported_taxonomies = $this->get_filtered_taxonomies();
 
 		if ( empty( $supported_taxonomies ) || ! is_array( $supported_taxonomies ) ) {
 			return;
 		}
 
-		// Extract taxonomy slugs from objects
+		// Extract taxonomy slugs from objects.
 		$taxonomy_slugs = array();
 		foreach ( $supported_taxonomies as $tax_obj ) {
 			if ( isset( $tax_obj->name ) ) {
@@ -316,7 +315,7 @@ class Setup {
 			}
 		}
 
-		// Only proceed if the changed term is in a supported taxonomy
+		// Only proceed if the changed term is in a supported taxonomy.
 		if ( in_array( $taxonomy, $taxonomy_slugs, true ) ) {
 			$this->clear_cache();
 		}
@@ -337,7 +336,7 @@ class Setup {
 	 * @return void
 	 */
 	public function clear_cache_on_term_relationship( int $object_id, array $terms, array $tt_ids ): void {
-		// Only proceed if terms were assigned to a supported post
+		// Only proceed if terms were assigned to a supported post.
 		if ( $this->is_supported_post( $object_id ) ) {
 			$this->clear_cache();
 		}
@@ -359,15 +358,15 @@ class Setup {
 			return array();
 		}
 		
-		// Get the support args (third parameter from add_post_type_support)
+		// Get the support args (third parameter from add_post_type_support).
 		$supports = get_all_post_type_supports( $post_type );
 		
 		if ( isset( $supports['gatherpress_statistics'] ) && is_array( $supports['gatherpress_statistics'] ) ) {
-			// Return the first element which contains our configuration
+			// Return the first element which contains our configuration.
 			return reset( $supports['gatherpress_statistics'] );
 		}
 		
-		// Default configuration if none found
+		// Default configuration if none found.
 		return array(
 			'total_events'                => true,
 			'events_per_taxonomy'         => true,
@@ -412,7 +411,7 @@ class Setup {
 			return array();
 		}
 		
-		// Filter to only enabled types
+		// Filter to only enabled types.
 		$enabled_types = array();
 		foreach ( $config as $type => $enabled ) {
 			if ( $enabled ) {
@@ -497,7 +496,7 @@ class Setup {
 		
 		$all_taxonomies = array();
 		
-		// Get taxonomies for each supported post type
+		// Get taxonomies for each supported post type.
 		foreach ( $post_types as $post_type ) {
 			if ( ! post_type_exists( $post_type ) ) {
 				continue;
@@ -506,7 +505,7 @@ class Setup {
 			$taxonomies = \get_object_taxonomies( $post_type, 'objects' );
 			
 			if ( ! empty( $taxonomies ) && is_array( $taxonomies ) ) {
-				// Merge taxonomies, avoiding duplicates by slug
+				// Merge taxonomies, avoiding duplicates by slug.
 				foreach ( $taxonomies as $taxonomy ) {
 					if ( isset( $taxonomy->name ) ) {
 						$all_taxonomies[ $taxonomy->name ] = $taxonomy;
@@ -566,19 +565,19 @@ class Setup {
 			$for_editor
 		);
 		
-		// Ensure excluded taxonomies is an array
+		// Ensure excluded taxonomies is an array.
 		if ( ! is_array( $excluded_taxonomies ) ) {
 			$excluded_taxonomies = array();
 		}
 		
-		// Filter out excluded taxonomies
+		// Filter out excluded taxonomies.
 		$filtered_taxonomies = array();
 		foreach ( $taxonomies as $taxonomy ) {
 			if ( ! isset( $taxonomy->name ) ) {
 				continue;
 			}
 			
-			// Skip if this taxonomy is in the exclusion list
+			// Skip if this taxonomy is in the exclusion list.
 			if ( in_array( $taxonomy->name, $excluded_taxonomies, true ) ) {
 				continue;
 			}
@@ -612,19 +611,19 @@ class Setup {
 		$statistic_type = is_string( $statistic_type ) ? $statistic_type : 'total_events';
 		$filters = is_array( $filters ) ? $filters : array();
 		
-		// Start building the cache key
+		// Start building the cache key.
 		$key_parts = array( 'gatherpress_stats', $statistic_type );
 		
 		if ( ! empty( $filters['event_query'] ) && in_array( $filters['event_query'], array( 'upcoming', 'past' ), true ) ) {
 			$key_parts[] = sanitize_key( $filters['event_query'] );
 		}
 		
-		// Add a hash of ALL filters (including event_query) to ensure uniqueness
+		// Add a hash of ALL filters (including event_query) to ensure uniqueness.
 		if ( ! empty( $filters ) ) {
 			$key_parts[] = md5( wp_json_encode( $filters ) );
 		}
 		
-		// Join parts with underscores to create the final cache key
+		// Join parts with underscores to create the final cache key.
 		return implode( '_', $key_parts );
 	}
 
@@ -678,7 +677,7 @@ class Setup {
 			12 * HOUR_IN_SECONDS
 		);
 		
-		// Ensure the value is a positive integer
+		// Ensure the value is a positive integer.
 		if ( ! is_numeric( $expiration ) || $expiration < 1 ) {
 			$expiration = 12 * HOUR_IN_SECONDS;
 		}
@@ -720,7 +719,7 @@ class Setup {
 		
 		$result = 0;
 		
-		// Route to the appropriate calculation function based on type
+		// Route to the appropriate calculation function based on type.
 		switch ( $statistic_type ) {
 			case 'total_events':
 				$result = $this->count_events( $filters );
@@ -747,7 +746,7 @@ class Setup {
 				break;
 		}
 		
-		// Ensure result is always a non-negative integer
+		// Ensure result is always a non-negative integer.
 		$result = is_numeric( $result ) ? absint( $result ) : 0;
 
 		/**
@@ -871,7 +870,7 @@ class Setup {
 			}
 		}
 		
-		// Handle single taxonomy filter (taxonomy + term_id)
+		// Handle single taxonomy filter (taxonomy + term_id).
 		if ( ! empty( $filters['taxonomy'] ) && ! empty( $filters['term_id'] ) ) {
 			if ( taxonomy_exists( $filters['taxonomy'] ) ) {
 				$args['tax_query'] = array(
@@ -883,14 +882,14 @@ class Setup {
 				);
 			}
 		}
-		// Handle multiple taxonomy filters (taxonomy_terms)
+		// Handle multiple taxonomy filters (taxonomy_terms).
 		else if ( ! empty( $filters['taxonomy_terms'] ) && is_array( $filters['taxonomy_terms'] ) ) {
-			// Use AND relation so events must match ALL specified taxonomies
+			// Use AND relation so events must match ALL specified taxonomies.
 			$tax_query = array( 'relation' => 'AND' );
 			
-			// Loop through each taxonomy and its terms
+			// Loop through each taxonomy and its terms.
 			foreach ( $filters['taxonomy_terms'] as $taxonomy => $term_ids ) {
-				// Validate that we have term IDs and the taxonomy exists
+				// Validate that we have term IDs and the taxonomy exists.
 				if ( ! empty( $term_ids ) && is_array( $term_ids ) && taxonomy_exists( $taxonomy ) ) {
 					$tax_query[] = array(
 						'taxonomy' => sanitize_key( $taxonomy ),
@@ -900,7 +899,7 @@ class Setup {
 				}
 			}
 			
-			// Only add tax_query if we have at least one taxonomy condition
+			// Only add tax_query if we have at least one taxonomy condition.
 			if ( count( $tax_query ) > 1 ) {
 				$args['tax_query'] = $tax_query;
 			}
@@ -942,19 +941,19 @@ class Setup {
 		$filters = is_array( $filters ) ? $filters : array();
 		$taxonomy = isset( $filters['taxonomy'] ) && is_string( $filters['taxonomy'] ) ? $filters['taxonomy'] : '';
 		
-		// Validate taxonomy parameter
+		// Validate taxonomy parameter.
 		if ( empty( $taxonomy ) || ! taxonomy_exists( $taxonomy ) ) {
 			return 0;
 		}
 		
-		// Get terms, hiding empty ones (terms with no posts)
+		// Get terms, hiding empty ones (terms with no posts).
 		$args = array(
 			'taxonomy'   => sanitize_key( $taxonomy ),
-			'hide_empty' => true,  // Only count terms with posts
-			'object_ids' => null,  // Will filter by post type below
+			'hide_empty' => true,  // Only count terms with posts.
+			'object_ids' => null,  // Will filter by post type below.
 		);
 		
-		// Get all post IDs from supported post types
+		// Get all post IDs from supported post types.
 		$post_query = new \WP_Query(
 			array(
 				'post_type'      => $post_types,
@@ -970,7 +969,7 @@ class Setup {
 		
 		$terms = \get_terms( $args );
 		
-		// Handle errors or empty results
+		// Handle errors or empty results.
 		if ( is_wp_error( $terms ) || ! is_array( $terms ) ) {
 			return 0;
 		}
@@ -1018,22 +1017,22 @@ class Setup {
 		
 		$filters = is_array( $filters ) ? $filters : array();
 		
-		// Extract parameters
+		// Extract parameters.
 		$count_taxonomy  = isset( $filters['count_taxonomy'] ) && is_string( $filters['count_taxonomy'] ) ? $filters['count_taxonomy'] : '';
 		$filter_taxonomy = isset( $filters['filter_taxonomy'] ) && is_string( $filters['filter_taxonomy'] ) ? $filters['filter_taxonomy'] : '';
 		$term_id         = isset( $filters['term_id'] ) ? absint( $filters['term_id'] ) : 0;
 		
-		// Validate required parameters
+		// Validate required parameters.
 		if ( empty( $count_taxonomy ) || empty( $filter_taxonomy ) || $term_id === 0 ) {
 			return 0;
 		}
 		
-		// Validate taxonomies exist
+		// Validate taxonomies exist.
 		if ( ! taxonomy_exists( $count_taxonomy ) || ! taxonomy_exists( $filter_taxonomy ) ) {
 			return 0;
 		}
 		
-		// Step 1: Get all events in the filter taxonomy term
+		// Step 1: Get all events in the filter taxonomy term.
 		$args = array(
 			'post_type'      => $post_types,
 			'post_status'    => 'publish',
@@ -1051,21 +1050,21 @@ class Setup {
 		$query = new \WP_Query( $args );
 		$terms = array();
 		
-		// Step 2: For each event, get its terms from count_taxonomy
+		// Step 2: For each event, get its terms from count_taxonomy.
 		if ( is_array( $query->posts ) ) {
 			foreach ( $query->posts as $post_id ) {
-				// Get all terms for this post in the count_taxonomy
+				// Get all terms for this post in the count_taxonomy.
 				$post_terms = wp_get_post_terms( $post_id, sanitize_key( $count_taxonomy ), array( 'fields' => 'ids' ) );
 				
-				// Accumulate term IDs
+				// Accumulate term IDs.
 				if ( ! is_wp_error( $post_terms ) && is_array( $post_terms ) && ! empty( $post_terms ) ) {
 					$terms = array_merge( $terms, $post_terms );
 				}
 			}
 		}
 
-		// Step 3: Count unique terms
-		// array_unique removes duplicates, count gives us the total
+		// Step 3: Count unique terms,
+		// array_unique removes duplicates, count gives us the total.
 		return absint( count( array_unique( $terms ) ) );
 	}
 
@@ -1132,7 +1131,7 @@ class Setup {
 			'fields'         => 'ids',
 		);
 		
-		// Add GatherPress event query parameter with proper validation
+		// Add GatherPress event query parameter with proper validation.
 		if ( isset( $filters['event_query'] ) && is_string( $filters['event_query'] ) ) {
 			$event_query = sanitize_key( $filters['event_query'] );
 			if ( in_array( $event_query, array( 'upcoming', 'past' ), true ) ) {
@@ -1140,7 +1139,7 @@ class Setup {
 			}
 		}
 		
-		// Apply single taxonomy filter if provided
+		// Apply single taxonomy filter if provided.
 		if ( ! empty( $filters['taxonomy'] ) && ! empty( $filters['term_id'] ) ) {
 			if ( taxonomy_exists( $filters['taxonomy'] ) ) {
 				$args['tax_query'] = array(
@@ -1152,9 +1151,9 @@ class Setup {
 				);
 			}
 		}
-		// Apply multiple taxonomy filters if provided
+		// Apply multiple taxonomy filters if provided.
 		else if ( ! empty( $filters['taxonomy_terms'] ) && is_array( $filters['taxonomy_terms'] ) ) {
-			// Use AND relation so events must match ALL specified taxonomies
+			// Use AND relation so events must match ALL specified taxonomies.
 			$tax_query = array( 'relation' => 'AND' );
 			
 			foreach ( $filters['taxonomy_terms'] as $taxonomy => $term_ids ) {
@@ -1167,23 +1166,23 @@ class Setup {
 				}
 			}
 			
-			// Only add tax_query if we have at least one taxonomy condition
+			// Only add tax_query if we have at least one taxonomy condition.
 			if ( count( $tax_query ) > 1 ) {
 				$args['tax_query'] = $tax_query;
 			}
 		}
 		
-		// Execute the query to get matching event IDs
+		// Execute the query to get matching event IDs.
 		$query = new \WP_Query( $args );
 		$total_attendees = 0;
 		
-		// Sum attendee counts from post meta
+		// Sum attendee counts from post meta.
 		if ( is_array( $query->posts ) && ! empty( $query->posts ) ) {
 			foreach ( $query->posts as $post_id ) {
-				// Get the attendee count for this event
+				// Get the attendee count for this event.
 				$attendee_count = (int) get_post_meta( $post_id, 'gatherpress_attendee_count', true );
 				
-				// Add to total if it's a valid number
+				// Add to total if it's a valid number.
 				if ( is_numeric( $attendee_count ) ) {
 					$total_attendees += absint( $attendee_count );
 				}
@@ -1234,28 +1233,28 @@ class Setup {
 			return 0;
 		}
 
-		// Get configured cache expiration time
+		// Get configured cache expiration time.
 		$expiration = $this->get_cache_expiration();
 
-		// Generate unique cache key for this configuration
+		// Generate unique cache key for this configuration.
 		$cache_key = $this->get_cache_key( $statistic_type, $filters );
 		
-		// Try to get cached value
+		// Try to get cached value.
 		$cached = get_transient( $cache_key );
 		
-		// Validate cached value and return if valid
+		// Validate cached value and return if valid.
 		if ( false !== $cached && is_numeric( $cached ) ) {
 			return absint( $cached );
 		}
 		
-		// Cache miss - calculate the value
+		// Cache miss - calculate the value.
 		$value = $this->calculate( $statistic_type, $filters );
 		
-		// Ensure value is integer
+		// Ensure value is integer.
 		$value = is_numeric( $value ) ? absint( $value ) : 0;
 
-		// Store in cache with configured expiration time
-		// Note: Cache is cleared automatically on data changes
+		// Store in cache with configured expiration time.
+		// Note: Cache is cleared automatically on data changes.
 		\set_transient( $cache_key, $value, $expiration );
 		
 		return $value;
@@ -1305,10 +1304,10 @@ class Setup {
 			return array();
 		}
 		
-		// Event query types to generate statistics for (ONLY upcoming and past, never empty/all)
+		// Event query types to generate statistics for (ONLY upcoming and past, never empty/all).
 		$event_queries = array( 'upcoming', 'past' );
 		
-		// Basic statistics for each event query type (only if supported)
+		// Basic statistics for each event query type (only if supported).
 		foreach ( $event_queries as $event_query ) {
 			if ( in_array( 'total_events', $supported_types, true ) ) {
 				$configs[] = array(
@@ -1318,7 +1317,7 @@ class Setup {
 			}
 		}
 		
-		// Total attendees should only be pre-generated for PAST events
+		// Total attendees should only be pre-generated for PAST events.
 		if ( in_array( 'total_attendees', $supported_types, true ) ) {
 			$configs[] = array(
 				'type'    => 'total_attendees',
@@ -1326,20 +1325,20 @@ class Setup {
 			);
 		}
 		
-		// Get filtered taxonomies (respects exclusion filter)
+		// Get filtered taxonomies (respects exclusion filter).
 		$taxonomies = $this->get_filtered_taxonomies();
 		
 		if ( empty( $taxonomies ) || ! is_array( $taxonomies ) ) {
 			return $configs;
 		}
 		
-		// Generate configurations for each taxonomy
+		// Generate configurations for each taxonomy.
 		foreach ( $taxonomies as $taxonomy ) {
 			if ( ! isset( $taxonomy->name ) ) {
 				continue;
 			}
 			
-			// Total terms count for this taxonomy (only if supported)
+			// Total terms count for this taxonomy (only if supported).
 			if ( in_array( 'total_taxonomy_terms', $supported_types, true ) ) {
 				$configs[] = array(
 					'type'    => 'total_taxonomy_terms',
@@ -1347,7 +1346,7 @@ class Setup {
 				);
 			}
 			
-			// Get all terms in this taxonomy
+			// Get all terms in this taxonomy.
 			$terms = \get_terms(
 				array(
 					'taxonomy'   => $taxonomy->name,
@@ -1356,7 +1355,7 @@ class Setup {
 			);
 			
 			if ( ! is_wp_error( $terms ) && is_array( $terms ) && ! empty( $terms ) ) {
-				// Generate statistics for each term with each event query type
+				// Generate statistics for each term with each event query type.
 				foreach ( $terms as $term ) {
 					if ( ! isset( $term->term_id ) ) {
 						continue;
@@ -1369,7 +1368,7 @@ class Setup {
 							'event_query' => $event_query,
 						);
 						
-						// Events in this term (only if supported)
+						// Events in this term (only if supported).
 						if ( in_array( 'events_per_taxonomy', $supported_types, true ) ) {
 							$configs[] = array(
 								'type'    => 'events_per_taxonomy',
@@ -1378,7 +1377,7 @@ class Setup {
 						}
 					}
 					
-					// Attendees at events in this term - ONLY for PAST events
+					// Attendees at events in this term - ONLY for PAST events.
 					if ( in_array( 'total_attendees', $supported_types, true ) ) {
 						$configs[] = array(
 							'type'    => 'total_attendees',
@@ -1394,16 +1393,16 @@ class Setup {
 		}
 
 		// Generate cross-taxonomy configurations if we have multiple taxonomies
-		// and if taxonomy_terms_by_taxonomy is supported
+		// and if taxonomy_terms_by_taxonomy is supported.
 		if ( in_array( 'taxonomy_terms_by_taxonomy', $supported_types, true ) 
 			&& is_array( $taxonomies ) 
 			&& count( $taxonomies ) > 1 ) {
 			$taxonomy_array = array_values( $taxonomies );
 			
-			// Loop through each pair of taxonomies
+			// Loop through each pair of taxonomies.
 			for ( $i = 0; $i < count( $taxonomy_array ); $i++ ) {
 				for ( $j = 0; $j < count( $taxonomy_array ); $j++ ) {
-					// Skip if same taxonomy
+					// Skip if same taxonomy.
 					if ( $i !== $j ) {
 						$filter_tax = $taxonomy_array[ $i ];
 						$count_tax  = $taxonomy_array[ $j ];
@@ -1412,7 +1411,7 @@ class Setup {
 							continue;
 						}
 						
-						// Get up to 10 terms from filter taxonomy to keep pre-generation manageable
+						// Get up to 10 terms from filter taxonomy to keep pre-generation manageable.
 						$terms = \get_terms(
 							array(
 								'taxonomy'   => $filter_tax->name,
@@ -1427,7 +1426,7 @@ class Setup {
 									continue;
 								}
 								
-								// "How many X taxonomy terms have events in Y term?"
+								// How many X taxonomy terms have events in Y term?
 								$configs[] = array(
 									'type'    => 'taxonomy_terms_by_taxonomy',
 									'filters' => array(
@@ -1476,44 +1475,44 @@ class Setup {
 	 * @return void
 	 */
 	public function pregenerate_cache(): void {
-		// Only proceed if any post types support statistics
+		// Only proceed if any post types support statistics.
 		if ( ! $this->has_supported_post_types() ) {
 			return;
 		}
 		
-		// Get array of common statistic configurations (filtered by supported types)
+		// Get array of common statistic configurations (filtered by supported types).
 		$configs = $this->get_common_configs();
 		
 		if ( ! is_array( $configs ) ) {
 			return;
 		}
 
-		// Get configured cache expiration time
+		// Get configured cache expiration time.
 		$expiration = $this->get_cache_expiration();
 
-		// Loop through each configuration and pre-generate
+		// Loop through each configuration and pre-generate.
 		foreach ( $configs as $config ) {
-			// Validate configuration has required keys
+			// Validate configuration has required keys.
 			if ( ! isset( $config['type'] ) || ! isset( $config['filters'] ) ) {
 				continue;
 			}
 			
-			// Generate the cache key
+			// Generate the cache key.
 			$cache_key = $this->get_cache_key(
 				$config['type'],
 				$config['filters']
 			);
 			
-			// Calculate the statistic value
+			// Calculate the statistic value.
 			$value = $this->calculate(
 				$config['type'],
 				$config['filters']
 			);
 			
-			// Ensure value is a non-negative integer
+			// Ensure value is a non-negative integer.
 			$value = is_numeric( $value ) ? absint( $value ) : 0;
 			
-			// Store in cache with configured expiration time
+			// Store in cache with configured expiration time.
 			\set_transient( $cache_key, $value, $expiration );
 		}
 	}
@@ -1540,26 +1539,28 @@ class Setup {
 	 *
 	 * @since 0.1.0
 	 *
-	 * @global \wpdb $wpdb WordPress database abstraction object.
 	 * @return void
 	 */
 	public function clear_cache(): void {
+		/**
+		 * @var \wpdb  $wpdb WordPress database abstraction object.
+		 */
 		global $wpdb;
 		
-		// Delete all statistics transients from options table immediately
+		// Delete all statistics transients from options table immediately.
 		$wpdb->query(
 			"DELETE FROM {$wpdb->options} 
 			WHERE option_name LIKE '_transient_gatherpress_stats_%' 
 			OR option_name LIKE '_transient_timeout_gatherpress_stats_%'"
 		);
 		
-		// Check if a regeneration job is already scheduled
+		// Check if a regeneration job is already scheduled.
 		$scheduled = wp_next_scheduled( 'gatherpress_statistics_regenerate_cache' );
 		
-		// Only schedule if not already scheduled
+		// Only schedule if not already scheduled.
 		if ( ! $scheduled ) {
-			// Schedule regeneration to run once, 60 seconds from now
-			// This prevents multiple regenerations during bulk operations
+			// Schedule regeneration to run once, 60 seconds from now.
+			// This prevents multiple regenerations during bulk operations.
 			wp_schedule_single_event(
 				time() + 60,
 				'gatherpress_statistics_regenerate_cache'
@@ -1590,7 +1591,7 @@ class Setup {
 			return false;
 		}
 		
-		// Statistic types that require cache clearing when terms change
+		// Statistic types that require cache clearing when terms change.
 		$term_dependent_types = array(
 			'events_per_taxonomy',
 			'events_multi_taxonomy',
@@ -1598,7 +1599,7 @@ class Setup {
 			'taxonomy_terms_by_taxonomy',
 		);
 		
-		// Check if any term-dependent types are supported
+		// Check if any term-dependent types are supported.
 		foreach ( $term_dependent_types as $type ) {
 			if ( in_array( $type, $supported_types, true ) ) {
 				return true;

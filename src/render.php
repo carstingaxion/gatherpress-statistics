@@ -3,6 +3,27 @@
  * @see https://github.com/WordPress/gutenberg/blob/trunk/docs/reference-guides/block-api/block-metadata.md#render
  */
 
+/**
+ * Extract and sanitize block attributes.
+ *
+ * @var array{
+ *   statisticType?: string,
+ *   labelSingular?: string,
+ *   labelPlural?: string,
+ *   selectedTerm?: int,
+ *   selectedTaxonomy?: string,
+ *   selectedTaxonomyTerms?: array<string, mixed>,
+ *   countTaxonomy?: string,
+ *   filterTaxonomy?: string,
+ *   eventQuery?: string,
+ *   showLabel?: bool,
+ *   prefixDefault?: string,
+ *   suffixDefault?: string,
+ *   prefixConditional?: string,
+ *   suffixConditional?: string,
+ *   conditionalThreshold?: int,
+ * } $attributes
+ */
 $statistic_type = isset( $attributes['statisticType'] ) ? $attributes['statisticType'] : 'total_events';
 $label_singular = isset( $attributes['labelSingular'] ) ? $attributes['labelSingular'] : __( 'Event', 'gatherpress-statistics' );
 $label_plural   = isset( $attributes['labelPlural'] ) ? $attributes['labelPlural'] : __( 'Events', 'gatherpress-statistics' );
@@ -74,22 +95,22 @@ if ( 'events_multi_taxonomy' === $statistic_type ) {
 // $count = \GatherPressStatistics\get_cached( $statistic_type, $filters );
 $count = \GatherPress_Statistics\Setup::get_instance()->get_cached( $statistic_type, $filters );
 
-// Don't display if count is 0
-if ( $count === 0 ) {
+// Don't display if count is 0.
+if ( $count === 0 || ! is_int( $count ) ) {
 	return;
 }
 
-// Determine which prefix/suffix to use based on threshold
+// Determine which prefix/suffix to use based on threshold.
 $use_conditional = $count > $conditional_threshold;
 $display_prefix  = ( $use_conditional && ! empty( $prefix_conditional ) ) ? $prefix_conditional : $prefix_default;
 $display_suffix  = ( $use_conditional && ! empty( $suffix_conditional ) ) ? $suffix_conditional : $suffix_default;
 
-// Determine which label to use based on count (singular for 1, plural for everything else)
+// Determine which label to use based on count (singular for 1, plural for everything else).
 $display_label = ( 1 === $count ) ? $label_singular : $label_plural;
 
 ?>
 <figure <?php echo get_block_wrapper_attributes(); ?>>
-	<data class="gatherpress-stats-value" value="<?php echo esc_attr( $count ); ?>">
+	<data class="gatherpress-stats-value" value="<?php echo esc_attr( (string) $count ); ?>">
 		<?php 
 		if ( ! empty( $display_prefix ) ) {
 			?>

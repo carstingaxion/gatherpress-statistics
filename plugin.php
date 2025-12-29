@@ -31,8 +31,8 @@ define( 'GATHERPRESS_STATISTICS_CORE_PATH', __DIR__ );
  * This function hooks into the 'gatherpress_autoloader' filter and adds the
  * GatherPress_Statistics namespace to the list of namespaces with its core path.
  *
- * @param array $namespace An associative array of namespaces and their paths.
- * @return array Modified array of namespaces and their paths.
+ * @param array<string, string> $namespace An associative array of namespaces and their paths.
+ * @return array<string, string> Modified array of namespaces and their paths.
  */
 function gatherpress_statistics_autoloader( array $namespace ): array {
 	$namespace['GatherPress_Statistics'] = GATHERPRESS_STATISTICS_CORE_PATH;
@@ -86,20 +86,22 @@ register_activation_hook( __FILE__, 'gatherpress_statistics_activate_plugin' );
  *
  * @since 0.1.0
  *
- * @global \wpdb $wpdb WordPress database abstraction object.
  * @return void
  */
 function gatherpress_statistics_deactivate_plugin(): void {
+	/**
+	 * @var \wpdb  $wpdb WordPress database abstraction object.
+	 */
 	global $wpdb;
 	
-	// Delete all statistics transients from options table
+	// Delete all statistics transients from options table.
 	$wpdb->query(
 		"DELETE FROM {$wpdb->options} 
 		WHERE option_name LIKE '_transient_gatherpress_stats_%' 
 		OR option_name LIKE '_transient_timeout_gatherpress_stats_%'"
 	);
 	
-	// Clear any scheduled regeneration jobs
+	// Clear any scheduled regeneration jobs.
 	$scheduled = wp_next_scheduled( 'gatherpress_statistics_regenerate_cache' );
 	if ( $scheduled ) {
 		wp_unschedule_event( $scheduled, 'gatherpress_statistics_regenerate_cache' );
