@@ -1,16 +1,20 @@
 /**
  * Frontend JavaScript for GatherPress Statistics block.
- * 
+ *
  * This file adds confetti animation to the confetti style variation
  * and other interactive enhancements.
  */
 
 document.addEventListener( 'DOMContentLoaded', function() {
-	const statBlocks = document.querySelectorAll( '.wp-block-gatherpress-statistics' );
+	const statBlocks = document.querySelectorAll(
+		'.wp-block-gatherpress-statistics'
+	);
 
-	statBlocks.forEach( function( block ) {
-		const numberElement = block.querySelector( '.gatherpress-stats-number' );
-		
+	statBlocks.forEach( function ( block ) {
+		const numberElement = block.querySelector(
+			'.gatherpress-stats-number'
+		);
+
 		if ( numberElement ) {
 			// Fade in animation for all blocks
 			numberElement.style.opacity = '0';
@@ -37,7 +41,16 @@ document.addEventListener( 'DOMContentLoaded', function() {
 		block.appendChild( confettiContainer );
 
 		// Confetti colors
-		const colors = [ '#ff6b6b', '#4ecdc4', '#45b7d1', '#f9ca24', '#f0932b', '#eb4d4b', '#6c5ce7', '#a29bfe' ];
+		const colors = [
+			'#ff6b6b',
+			'#4ecdc4',
+			'#45b7d1',
+			'#f9ca24',
+			'#f0932b',
+			'#eb4d4b',
+			'#6c5ce7',
+			'#a29bfe',
+		];
 
 		/**
 		 * Create a single confetti piece
@@ -64,11 +77,14 @@ document.addEventListener( 'DOMContentLoaded', function() {
 			confettiContainer.appendChild( confetti );
 			
 			// Remove confetti after animation completes
-			setTimeout( function() {
-				if ( confetti.parentNode ) {
-					confetti.parentNode.removeChild( confetti );
-				}
-			}, ( animationDuration + animationDelay ) * 1000 );
+			setTimeout(
+				function () {
+					if ( confetti.parentNode ) {
+						confetti.parentNode.removeChild( confetti );
+					}
+				},
+				( animationDuration + animationDelay ) * 1000
+			);
 		}
 
 		/**
