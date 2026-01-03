@@ -77,12 +77,12 @@ class Setup {
 	 */
 	public function register_post_type_support(): void {
 		$default_config = array(
-			'total_events'                => true,
-			'events_per_taxonomy'         => true,
-			'events_multi_taxonomy'       => false,
-			'total_taxonomy_terms'        => false,
-			'taxonomy_terms_by_taxonomy'  => false,
-			'total_attendees'             => true,
+			'total_events'               => true,
+			'events_per_taxonomy'        => true,
+			'events_multi_taxonomy'      => false,
+			'total_taxonomy_terms'       => false,
+			'taxonomy_terms_by_taxonomy' => false,
+			'total_attendees'            => true,
 		);
 		
 		/**
@@ -330,9 +330,9 @@ class Setup {
 	 *
 	 * @since 0.1.0
 	 *
-	 * @param int                 $object_id Object ID (post ID).
-	 * @param array<int, int>     $terms     An array of term IDs.
-	 * @param array<int, int>     $tt_ids    An array of term taxonomy IDs.
+	 * @param int             $object_id Object ID (post ID).
+	 * @param array<int, int> $terms     An array of term IDs.
+	 * @param array<int, int> $tt_ids    An array of term taxonomy IDs.
 	 * @return void
 	 */
 	public function clear_cache_on_term_relationship( int $object_id, array $terms, array $tt_ids ): void {
@@ -368,12 +368,12 @@ class Setup {
 		
 		// Default configuration if none found.
 		return array(
-			'total_events'                => true,
-			'events_per_taxonomy'         => true,
-			'events_multi_taxonomy'       => true,
-			'total_taxonomy_terms'        => true,
-			'taxonomy_terms_by_taxonomy'  => true,
-			'total_attendees'             => true,
+			'total_events'               => true,
+			'events_per_taxonomy'        => true,
+			'events_multi_taxonomy'      => true,
+			'total_taxonomy_terms'       => true,
+			'taxonomy_terms_by_taxonomy' => true,
+			'total_attendees'            => true,
 		);
 	}
 
@@ -469,7 +469,7 @@ class Setup {
 	 * @param int $post_id Post ID to check.
 	 * @return bool True if supported, false otherwise.
 	 */
-	protected function is_supported_post( int $post_id ) : bool {
+	protected function is_supported_post( int $post_id ): bool {
 		$post = get_post( $post_id );
 		
 		return post_type_supports( $post->post_type, 'gatherpress_statistics' ) 
@@ -609,7 +609,7 @@ class Setup {
 	 */
 	protected function get_cache_key( string $statistic_type, array $filters = array() ): string {
 		$statistic_type = is_string( $statistic_type ) ? $statistic_type : 'total_events';
-		$filters = is_array( $filters ) ? $filters : array();
+		$filters        = is_array( $filters ) ? $filters : array();
 		
 		// Start building the cache key.
 		$key_parts = array( 'gatherpress_stats', $statistic_type );
@@ -711,7 +711,7 @@ class Setup {
 		}
 		
 		$statistic_type = is_string( $statistic_type ) ? $statistic_type : 'total_events';
-		$filters = is_array( $filters ) ? $filters : array();
+		$filters        = is_array( $filters ) ? $filters : array();
 		
 		if ( empty( $filters['event_query'] ) || ! in_array( $filters['event_query'], array( 'upcoming', 'past' ), true ) ) {
 			return 0;
@@ -856,7 +856,7 @@ class Setup {
 		$filters = is_array( $filters ) ? $filters : array();
 		
 		$args = array(
-			#'post_type'      => 'gatherpress_event',
+			// 'post_type'      => 'gatherpress_event',
 			'post_type'      => $post_types,
 			'post_status'    => 'publish',
 			'posts_per_page' => -1,
@@ -883,7 +883,7 @@ class Setup {
 			}
 		}
 		// Handle multiple taxonomy filters (taxonomy_terms).
-		else if ( ! empty( $filters['taxonomy_terms'] ) && is_array( $filters['taxonomy_terms'] ) ) {
+		elseif ( ! empty( $filters['taxonomy_terms'] ) && is_array( $filters['taxonomy_terms'] ) ) {
 			// Use AND relation so events must match ALL specified taxonomies.
 			$tax_query = array( 'relation' => 'AND' );
 			
@@ -938,7 +938,7 @@ class Setup {
 			return 0;
 		}
 		
-		$filters = is_array( $filters ) ? $filters : array();
+		$filters  = is_array( $filters ) ? $filters : array();
 		$taxonomy = isset( $filters['taxonomy'] ) && is_string( $filters['taxonomy'] ) ? $filters['taxonomy'] : '';
 		
 		// Validate taxonomy parameter.
@@ -1124,7 +1124,7 @@ class Setup {
 		$filters = is_array( $filters ) ? $filters : array();
 		
 		$args = array(
-			#'post_type'      => 'gatherpress_event',
+			// 'post_type'      => 'gatherpress_event',
 			'post_type'      => $post_types,
 			'post_status'    => 'publish',
 			'posts_per_page' => -1,
@@ -1152,7 +1152,7 @@ class Setup {
 			}
 		}
 		// Apply multiple taxonomy filters if provided.
-		else if ( ! empty( $filters['taxonomy_terms'] ) && is_array( $filters['taxonomy_terms'] ) ) {
+		elseif ( ! empty( $filters['taxonomy_terms'] ) && is_array( $filters['taxonomy_terms'] ) ) {
 			// Use AND relation so events must match ALL specified taxonomies.
 			$tax_query = array( 'relation' => 'AND' );
 			
@@ -1173,7 +1173,7 @@ class Setup {
 		}
 		
 		// Execute the query to get matching event IDs.
-		$query = new \WP_Query( $args );
+		$query           = new \WP_Query( $args );
 		$total_attendees = 0;
 		
 		// Sum attendee counts from post meta.

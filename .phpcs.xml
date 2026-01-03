@@ -29,5 +29,14 @@
 
 		</properties>
 	</rule> 
-
+	<rule ref="WordPress">
+		<exclude name="WordPress.Files.FileName.InvalidClassFileName" />
+	</rule>
+	<rule ref="Universal">
+		<exclude name="Universal.Lists.DisallowShortListSyntax"/>
+		<exclude name="Universal.Namespaces.EnforceCurlyBraceSyntax.Forbidden" />
+		<exclude name="Universal.PHP.RequireExitDieParentheses.Missing" />
+		<exclude name="Universal.Classes.RequireFinalClass.NonFinalClassFound" />
+		<exclude name="Universal.Files.SeparateFunctionsFromOO.Mixed" />
+	</rule>
 </ruleset>

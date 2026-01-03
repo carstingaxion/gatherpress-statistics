@@ -165,12 +165,12 @@ class Setup {
 	 */
 	public function register_post_type_support(): void {
 		$default_config = array(
-			'total_events'                => true,
-			'events_per_taxonomy'         => true,
-			'events_multi_taxonomy'       => false,
-			'total_taxonomy_terms'        => false,
-			'taxonomy_terms_by_taxonomy'  => false,
-			'total_attendees'             => true,
+			'total_events'               => true,
+			'events_per_taxonomy'        => true,
+			'events_multi_taxonomy'      => false,
+			'total_taxonomy_terms'       => false,
+			'taxonomy_terms_by_taxonomy' => false,
+			'total_attendees'            => true,
 		);
 		
 		$config = apply_filters( 'gatherpress_statistics_support_config', $default_config );
@@ -241,7 +241,7 @@ class Database {
 	public function create_archive_table(): void {
 		global $wpdb;
 		
-		$table_name = $wpdb->prefix . 'gatherpress_statistics_archive';
+		$table_name      = $wpdb->prefix . 'gatherpress_statistics_archive';
 		$charset_collate = $wpdb->get_charset_collate();
 		
 		$sql = 
@@ -291,7 +291,7 @@ class Database {
 		$filters_hash = md5( wp_json_encode( $filter_copy ) );
 		
 		$post_types = Support::get_instance()->get_supported_post_types();
-		$post_type = ! empty( $post_types ) ? $post_types[0] : 'gatherpress_event';
+		$post_type  = ! empty( $post_types ) ? $post_types[0] : 'gatherpress_event';
 		
 		$result = $wpdb->get_var(
 			$wpdb->prepare(
@@ -375,12 +375,12 @@ class Support {
 		}
 		
 		return array(
-			'total_events'                => true,
-			'events_per_taxonomy'         => true,
-			'events_multi_taxonomy'       => true,
-			'total_taxonomy_terms'        => true,
-			'taxonomy_terms_by_taxonomy'  => true,
-			'total_attendees'             => true,
+			'total_events'               => true,
+			'events_per_taxonomy'        => true,
+			'events_multi_taxonomy'      => true,
+			'total_taxonomy_terms'       => true,
+			'taxonomy_terms_by_taxonomy' => true,
+			'total_attendees'            => true,
 		);
 	}
 
@@ -465,7 +465,7 @@ class Support {
 	 * @param int $post_id Post ID to check.
 	 * @return bool True if supported.
 	 */
-	public function is_supported_post( int $post_id ) : bool {
+	public function is_supported_post( int $post_id ): bool {
 		$post = get_post( $post_id );
 		
 		return post_type_supports( $post->post_type, 'gatherpress_statistics' ) 
@@ -677,7 +677,7 @@ class Cache {
 	 */
 	public function get_cache_key( string $statistic_type, array $filters = array() ): string {
 		$statistic_type = is_string( $statistic_type ) ? $statistic_type : 'total_events';
-		$filters = is_array( $filters ) ? $filters : array();
+		$filters        = is_array( $filters ) ? $filters : array();
 		
 		$key_parts = array( 'gatherpress_stats', $statistic_type );
 		
@@ -1034,7 +1034,7 @@ class Statistics {
 		}
 
 		$statistic_type = is_string( $statistic_type ) ? $statistic_type : 'total_events';
-		$filters = is_array( $filters ) ? $filters : array();
+		$filters        = is_array( $filters ) ? $filters : array();
 		
 		if ( empty( $filters['event_query'] ) || ! in_array( $filters['event_query'], array( 'upcoming', 'past' ), true ) ) {
 			return 0;
@@ -1188,8 +1188,7 @@ class Query {
 					),
 				);
 			}
-		}
-		else if ( ! empty( $filters['taxonomy_terms'] ) && is_array( $filters['taxonomy_terms'] ) ) {
+		} elseif ( ! empty( $filters['taxonomy_terms'] ) && is_array( $filters['taxonomy_terms'] ) ) {
 			$tax_query = array( 'relation' => 'AND' );
 			
 			foreach ( $filters['taxonomy_terms'] as $taxonomy => $term_ids ) {
@@ -1227,7 +1226,7 @@ class Query {
 			return 0;
 		}
 		
-		$filters = is_array( $filters ) ? $filters : array();
+		$filters  = is_array( $filters ) ? $filters : array();
 		$taxonomy = isset( $filters['taxonomy'] ) && is_string( $filters['taxonomy'] ) ? $filters['taxonomy'] : '';
 		
 		if ( empty( $taxonomy ) || ! taxonomy_exists( $taxonomy ) ) {
@@ -1376,8 +1375,7 @@ class Query {
 					),
 				);
 			}
-		}
-		else if ( ! empty( $filters['taxonomy_terms'] ) && is_array( $filters['taxonomy_terms'] ) ) {
+		} elseif ( ! empty( $filters['taxonomy_terms'] ) && is_array( $filters['taxonomy_terms'] ) ) {
 			$tax_query = array( 'relation' => 'AND' );
 			
 			foreach ( $filters['taxonomy_terms'] as $taxonomy => $term_ids ) {
@@ -1395,7 +1393,7 @@ class Query {
 			}
 		}
 		
-		$query = new \WP_Query( $args );
+		$query           = new \WP_Query( $args );
 		$total_attendees = 0;
 		
 		if ( is_array( $query->posts ) && ! empty( $query->posts ) ) {
@@ -1484,12 +1482,12 @@ class QueryFilters {
 		$date_conditions = array();
 
 		if ( ! empty( $date_filter['year'] ) ) {
-			$year = absint( $date_filter['year'] );
+			$year              = absint( $date_filter['year'] );
 			$date_conditions[] = $wpdb->prepare( 'YEAR(ge.datetime_start_gmt) = %d', $year );
 		}
 
 		if ( ! empty( $date_filter['month'] ) ) {
-			$month = absint( $date_filter['month'] );
+			$month             = absint( $date_filter['month'] );
 			$date_conditions[] = $wpdb->prepare( 'MONTH(ge.datetime_start_gmt) = %d', $month );
 		}
 
@@ -1504,7 +1502,7 @@ class QueryFilters {
 		);
 
 		$events_table = $wpdb->prefix . 'gatherpress_events';
-		$date_where = implode( ' AND ', $date_conditions );
+		$date_where   = implode( ' AND ', $date_conditions );
 
 		$where .= " AND {$wpdb->posts}.ID IN (
 			SELECT ge.post_id 
@@ -1652,9 +1650,9 @@ class CacheInvalidation {
 	 *
 	 * @since 0.1.0
 	 *
-	 * @param int                 $object_id Object ID.
-	 * @param array<int, int>     $terms     Term IDs.
-	 * @param array<int, int>     $tt_ids    Term taxonomy IDs.
+	 * @param int             $object_id Object ID.
+	 * @param array<int, int> $terms     Term IDs.
+	 * @param array<int, int> $tt_ids    Term taxonomy IDs.
 	 * @return void
 	 */
 	public function clear_cache_on_term_relationship( int $object_id, array $terms, array $tt_ids ): void {
@@ -1900,7 +1898,7 @@ class AdminPage {
 		}
 
 		if ( ! isset( $_POST['gatherpress_archive_nonce'] ) || 
-		     ! wp_verify_nonce( $_POST['gatherpress_archive_nonce'], 'gatherpress_generate_archive' ) ) {
+			! wp_verify_nonce( $_POST['gatherpress_archive_nonce'], 'gatherpress_generate_archive' ) ) {
 			return;
 		}
 
@@ -1908,7 +1906,7 @@ class AdminPage {
 			return;
 		}
 
-		$year = isset( $_POST['archive_year'] ) ? absint( $_POST['archive_year'] ) : 0;
+		$year  = isset( $_POST['archive_year'] ) ? absint( $_POST['archive_year'] ) : 0;
 		$month = isset( $_POST['archive_month'] ) ? absint( $_POST['archive_month'] ) : 0;
 
 		if ( ! $year || ! $month || $month < 1 || $month > 12 ) {
@@ -1949,17 +1947,17 @@ class AdminPage {
 	 * @return string Human-readable label.
 	 */
 	private function get_statistic_type_label( string $type ): string {
-		$post_types = Support::get_instance()->get_supported_post_types();
-		$post_type = ! empty( $post_types ) ? $post_types[0] : 'gatherpress_event';
+		$post_types   = Support::get_instance()->get_supported_post_types();
+		$post_type    = ! empty( $post_types ) ? $post_types[0] : 'gatherpress_event';
 		$plural_label = Support::get_instance()->get_post_type_plural_label( $post_type );
 
 		$labels = array(
-			'total_events'                => sprintf( __( 'Total %s', 'gatherpress-statistics' ), $plural_label ),
-			'events_per_taxonomy'         => sprintf( __( '%s per Taxonomy', 'gatherpress-statistics' ), $plural_label ),
-			'events_multi_taxonomy'       => sprintf( __( '%s (Multiple Taxonomies)', 'gatherpress-statistics' ), $plural_label ),
-			'total_taxonomy_terms'        => __( 'Total Taxonomy Terms', 'gatherpress-statistics' ),
-			'taxonomy_terms_by_taxonomy'  => __( 'Taxonomy Terms by Taxonomy', 'gatherpress-statistics' ),
-			'total_attendees'             => __( 'Total Attendees', 'gatherpress-statistics' ),
+			'total_events'               => sprintf( __( 'Total %s', 'gatherpress-statistics' ), $plural_label ),
+			'events_per_taxonomy'        => sprintf( __( '%s per Taxonomy', 'gatherpress-statistics' ), $plural_label ),
+			'events_multi_taxonomy'      => sprintf( __( '%s (Multiple Taxonomies)', 'gatherpress-statistics' ), $plural_label ),
+			'total_taxonomy_terms'       => __( 'Total Taxonomy Terms', 'gatherpress-statistics' ),
+			'taxonomy_terms_by_taxonomy' => __( 'Taxonomy Terms by Taxonomy', 'gatherpress-statistics' ),
+			'total_attendees'            => __( 'Total Attendees', 'gatherpress-statistics' ),
 		);
 
 		return isset( $labels[ $type ] ) ? $labels[ $type ] : ucwords( str_replace( '_', ' ', $type ) );
@@ -1980,28 +1978,28 @@ class AdminPage {
 		}
 
 		$data_by_term = array();
-		$all_dates = array();
+		$all_dates    = array();
 
 		foreach ( $statistics as $stat ) {
-			$filters = json_decode( $stat->filters_data, true );
-			$date_key = sprintf( '%d-%02d', $stat->statistic_year, $stat->statistic_month );
+			$filters                = json_decode( $stat->filters_data, true );
+			$date_key               = sprintf( '%d-%02d', $stat->statistic_year, $stat->statistic_month );
 			$all_dates[ $date_key ] = true;
 
 			$term_label = 'All';
-			$term_id = 0;
+			$term_id    = 0;
 
 			if ( isset( $filters['term_id'] ) && $filters['term_id'] > 0 ) {
 				$term = get_term( $filters['term_id'] );
 				if ( $term && ! is_wp_error( $term ) ) {
 					$term_label = $term->name;
-					$term_id = $term->term_id;
+					$term_id    = $term->term_id;
 				}
 			}
 
 			if ( ! isset( $data_by_term[ $term_id ] ) ) {
 				$data_by_term[ $term_id ] = array(
 					'label' => $term_label,
-					'data' => array(),
+					'data'  => array(),
 				);
 			}
 
@@ -2011,10 +2009,18 @@ class AdminPage {
 		$dates = array_keys( $all_dates );
 		sort( $dates );
 
-		$datasets = array();
-		$colors = array(
-			'#3366CC', '#DC3912', '#FF9900', '#109618', '#990099',
-			'#3B3EAC', '#0099C6', '#DD4477', '#66AA00', '#B82E2E',
+		$datasets    = array();
+		$colors      = array(
+			'#3366CC',
+			'#DC3912',
+			'#FF9900',
+			'#109618',
+			'#990099',
+			'#3B3EAC',
+			'#0099C6',
+			'#DD4477',
+			'#66AA00',
+			'#B82E2E',
 		);
 		$color_index = 0;
 
@@ -2025,25 +2031,28 @@ class AdminPage {
 			}
 
 			$color = $colors[ $color_index % count( $colors ) ];
-			$color_index++;
+			++$color_index;
 
 			$datasets[] = array(
-				'label' => $term_data['label'],
-				'data' => $values,
-				'termId' => $term_id,
-				'borderColor' => $color,
+				'label'           => $term_data['label'],
+				'data'            => $values,
+				'termId'          => $term_id,
+				'borderColor'     => $color,
 				'backgroundColor' => $color . '33',
-				'tension' => 0.4,
+				'tension'         => 0.4,
 			);
 		}
 
-		$labels = array_map( function( $date ) {
-			list( $year, $month ) = explode( '-', $date );
-			return date_i18n( 'M Y', mktime( 0, 0, 0, (int) $month, 1, (int) $year ) );
-		}, $dates );
+		$labels = array_map(
+			function ( $date ) {
+				[ $year, $month ] = explode( '-', $date );
+				return date_i18n( 'M Y', mktime( 0, 0, 0, (int) $month, 1, (int) $year ) );
+			},
+			$dates 
+		);
 
 		return array(
-			'labels' => $labels,
+			'labels'   => $labels,
 			'datasets' => $datasets,
 		);
 	}
@@ -2061,13 +2070,13 @@ class AdminPage {
 		
 		$table_name = $wpdb->prefix . 'gatherpress_statistics_archive';
 		
-		$selected_year = isset( $_GET['year'] ) ? absint( $_GET['year'] ) : null;
-		$selected_month = isset( $_GET['month'] ) ? absint( $_GET['month'] ) : null;
+		$selected_year     = isset( $_GET['year'] ) ? absint( $_GET['year'] ) : null;
+		$selected_month    = isset( $_GET['month'] ) ? absint( $_GET['month'] ) : null;
 		$selected_taxonomy = isset( $_GET['taxonomy'] ) ? sanitize_text_field( $_GET['taxonomy'] ) : null;
-		$selected_term = isset( $_GET['term_id'] ) ? absint( $_GET['term_id'] ) : null;
-		$current_tab = isset( $_GET['tab'] ) ? sanitize_text_field( $_GET['tab'] ) : '';
-		$order_by = isset( $_GET['orderby'] ) ? sanitize_text_field( $_GET['orderby'] ) : 'statistic_year';
-		$order = isset( $_GET['order'] ) && $_GET['order'] === 'asc' ? 'ASC' : 'DESC';
+		$selected_term     = isset( $_GET['term_id'] ) ? absint( $_GET['term_id'] ) : null;
+		$current_tab       = isset( $_GET['tab'] ) ? sanitize_text_field( $_GET['tab'] ) : '';
+		$order_by          = isset( $_GET['orderby'] ) ? sanitize_text_field( $_GET['orderby'] ) : 'statistic_year';
+		$order             = isset( $_GET['order'] ) && $_GET['order'] === 'asc' ? 'ASC' : 'DESC';
 		
 		$supported_types = Support::get_instance()->get_supported_statistic_types();
 		
@@ -2077,7 +2086,7 @@ class AdminPage {
 		
 		$years = $wpdb->get_col( "SELECT DISTINCT statistic_year FROM {$table_name} ORDER BY statistic_year DESC" );
 		
-		$taxonomies = array();
+		$taxonomies  = array();
 		$all_filters = $wpdb->get_col( "SELECT DISTINCT filters_data FROM {$table_name}" );
 		foreach ( $all_filters as $filters_json ) {
 			$filters = json_decode( $filters_json, true );
@@ -2088,21 +2097,21 @@ class AdminPage {
 		sort( $taxonomies );
 		
 		$where_clauses = array();
-		$query_params = array();
+		$query_params  = array();
 		
 		if ( ! empty( $current_tab ) ) {
 			$where_clauses[] = 'statistic_type = %s';
-			$query_params[] = $current_tab;
+			$query_params[]  = $current_tab;
 		}
 		
 		if ( $selected_year ) {
 			$where_clauses[] = 'statistic_year = %d';
-			$query_params[] = $selected_year;
+			$query_params[]  = $selected_year;
 		}
 		
 		if ( $selected_month ) {
 			$where_clauses[] = 'statistic_month = %d';
-			$query_params[] = $selected_month;
+			$query_params[]  = $selected_month;
 		}
 		
 		if ( $selected_taxonomy || $selected_term ) {
@@ -2135,17 +2144,20 @@ class AdminPage {
 		
 		$statistics = $wpdb->get_results( $query );
 		
-		$current_year = (int) date( 'Y' );
+		$current_year  = (int) date( 'Y' );
 		$current_month = (int) date( 'n' );
 		
-		$base_url = add_query_arg( array(
-			'page' => 'gatherpress-statistics-archive',
-			'tab' => $current_tab,
-			'year' => $selected_year,
-			'month' => $selected_month,
-			'taxonomy' => $selected_taxonomy,
-			'term_id' => $selected_term,
-		), admin_url( 'index.php' ) );
+		$base_url = add_query_arg(
+			array(
+				'page'     => 'gatherpress-statistics-archive',
+				'tab'      => $current_tab,
+				'year'     => $selected_year,
+				'month'    => $selected_month,
+				'taxonomy' => $selected_taxonomy,
+				'term_id'  => $selected_term,
+			),
+			admin_url( 'index.php' ) 
+		);
 		
 		$next_order = ( $order === 'ASC' ) ? 'desc' : 'asc';
 		
@@ -2171,9 +2183,9 @@ class AdminPage {
 							</th>
 							<td>
 								<select name="archive_year" id="archive_year" required>
-									<?php for ( $y = $current_year; $y >= 2020; $y-- ) : ?>
+									<?php for ( $y = $current_year; $y >= 2020; $y-- ) { ?>
 										<option value="<?php echo esc_attr( $y ); ?>"><?php echo esc_html( $y ); ?></option>
-									<?php endfor; ?>
+									<?php } ?>
 								</select>
 							</td>
 						</tr>
@@ -2183,11 +2195,11 @@ class AdminPage {
 							</th>
 							<td>
 								<select name="archive_month" id="archive_month" required>
-									<?php for ( $m = 1; $m <= 12; $m++ ) : ?>
+									<?php for ( $m = 1; $m <= 12; $m++ ) { ?>
 										<option value="<?php echo esc_attr( $m ); ?>" <?php selected( $m, $current_month ); ?>>
 											<?php echo esc_html( date_i18n( 'F', mktime( 0, 0, 0, $m, 1 ) ) ); ?>
 										</option>
-									<?php endfor; ?>
+									<?php } ?>
 								</select>
 							</td>
 						</tr>
@@ -2204,15 +2216,15 @@ class AdminPage {
 			<h2><?php esc_html_e( 'Archived Statistics', 'gatherpress-statistics' ); ?></h2>
 			
 			<h2 class="nav-tab-wrapper">
-				<?php foreach ( $supported_types as $type ) : ?>
+				<?php foreach ( $supported_types as $type ) { ?>
 					<a href="<?php echo esc_url( add_query_arg( 'tab', $type, remove_query_arg( array( 'orderby', 'order' ), $base_url ) ) ); ?>" 
-					   class="nav-tab <?php echo $type === $current_tab ? 'nav-tab-active' : ''; ?>">
+						class="nav-tab <?php echo $type === $current_tab ? 'nav-tab-active' : ''; ?>">
 						<?php echo esc_html( $this->get_statistic_type_label( $type ) ); ?>
 					</a>
-				<?php endforeach; ?>
+				<?php } ?>
 			</h2>
 			
-			<?php if ( ! empty( $chart_data ) ) : ?>
+			<?php if ( ! empty( $chart_data ) ) { ?>
 				<div class="gatherpress-stats-chart-container">
 					<div class="gatherpress-stats-chart-controls">
 						<h3><?php esc_html_e( 'Visual Comparison', 'gatherpress-statistics' ); ?></h3>
@@ -2344,7 +2356,7 @@ class AdminPage {
 						});
 					});
 				</script>
-			<?php endif; ?>
+			<?php } ?>
 			
 			<div class="tablenav top">
 				<form method="get">
@@ -2353,109 +2365,185 @@ class AdminPage {
 					
 					<select name="year">
 						<option value=""><?php esc_html_e( 'All Years', 'gatherpress-statistics' ); ?></option>
-						<?php foreach ( $years as $year ) : ?>
+						<?php foreach ( $years as $year ) { ?>
 							<option value="<?php echo esc_attr( $year ); ?>" <?php selected( $selected_year, $year ); ?>>
 								<?php echo esc_html( $year ); ?>
 							</option>
-						<?php endforeach; ?>
+						<?php } ?>
 					</select>
 					
 					<select name="month">
 						<option value=""><?php esc_html_e( 'All Months', 'gatherpress-statistics' ); ?></option>
-						<?php for ( $m = 1; $m <= 12; $m++ ) : ?>
+						<?php for ( $m = 1; $m <= 12; $m++ ) { ?>
 							<option value="<?php echo esc_attr( $m ); ?>" <?php selected( $selected_month, $m ); ?>>
 								<?php echo esc_html( date_i18n( 'F', mktime( 0, 0, 0, $m, 1 ) ) ); ?>
 							</option>
-						<?php endfor; ?>
+						<?php } ?>
 					</select>
 					
 					<select name="taxonomy">
 						<option value=""><?php esc_html_e( 'All Taxonomies', 'gatherpress-statistics' ); ?></option>
-						<?php foreach ( $taxonomies as $tax_slug ) : 
+						<?php
+						foreach ( $taxonomies as $tax_slug ) { 
 							$tax_obj = get_taxonomy( $tax_slug );
-							if ( $tax_obj ) :
-						?>
+							if ( $tax_obj ) {
+								?>
 							<option value="<?php echo esc_attr( $tax_slug ); ?>" <?php selected( $selected_taxonomy, $tax_slug ); ?>>
 								<?php echo esc_html( $tax_obj->labels->name ); ?>
 							</option>
-							<?php endif; ?>
-						<?php endforeach; ?>
+							<?php } ?>
+						<?php } ?>
 					</select>
 					
-					<?php if ( $selected_taxonomy ) : 
-						$terms = get_terms( array(
-							'taxonomy' => $selected_taxonomy,
-							'hide_empty' => false,
-						) );
-						if ( ! empty( $terms ) && ! is_wp_error( $terms ) ) :
-					?>
+					<?php
+					if ( $selected_taxonomy ) { 
+						$terms = get_terms(
+							array(
+								'taxonomy'   => $selected_taxonomy,
+								'hide_empty' => false,
+							) 
+						);
+						if ( ! empty( $terms ) && ! is_wp_error( $terms ) ) {
+							?>
 						<select name="term_id">
 							<option value=""><?php esc_html_e( 'All Terms', 'gatherpress-statistics' ); ?></option>
-							<?php foreach ( $terms as $term ) : ?>
+							<?php foreach ( $terms as $term ) { ?>
 								<option value="<?php echo esc_attr( $term->term_id ); ?>" <?php selected( $selected_term, $term->term_id ); ?>>
 									<?php echo esc_html( $term->name ); ?>
 								</option>
-							<?php endforeach; ?>
+							<?php } ?>
 						</select>
-						<?php endif; ?>
-					<?php endif; ?>
+						<?php } ?>
+					<?php } ?>
 					
 					<input type="submit" class="button" value="<?php esc_attr_e( 'Filter', 'gatherpress-statistics' ); ?>" />
 				</form>
 			</div>
 			
-			<?php if ( empty( $statistics ) ) : ?>
+			<?php if ( empty( $statistics ) ) { ?>
 				<p><?php esc_html_e( 'No archived statistics found.', 'gatherpress-statistics' ); ?></p>
-			<?php else : ?>
+			<?php } else { ?>
 				<table class="wp-list-table widefat fixed striped">
 					<thead>
 						<tr>
 							<th>
-								<a href="<?php echo esc_url( add_query_arg( array( 'orderby' => 'statistic_year', 'order' => $next_order ), $base_url ) ); ?>">
+								<a href="
+								<?php
+								echo esc_url(
+									add_query_arg(
+										array(
+											'orderby' => 'statistic_year',
+											'order'   => $next_order,
+										),
+										$base_url 
+									) 
+								);
+								?>
+											">
 									<?php esc_html_e( 'Year', 'gatherpress-statistics' ); ?>
-									<?php if ( $order_by === 'statistic_year' ) : ?>
+									<?php if ( $order_by === 'statistic_year' ) { ?>
 										<span class="dashicons dashicons-arrow-<?php echo $order === 'ASC' ? 'up' : 'down'; ?>"></span>
-									<?php endif; ?>
+									<?php } ?>
 								</a>
 							</th>
 							<th>
-								<a href="<?php echo esc_url( add_query_arg( array( 'orderby' => 'statistic_month', 'order' => $next_order ), $base_url ) ); ?>">
+								<a href="
+								<?php
+								echo esc_url(
+									add_query_arg(
+										array(
+											'orderby' => 'statistic_month',
+											'order'   => $next_order,
+										),
+										$base_url 
+									) 
+								);
+								?>
+											">
 									<?php esc_html_e( 'Month', 'gatherpress-statistics' ); ?>
-									<?php if ( $order_by === 'statistic_month' ) : ?>
+									<?php if ( $order_by === 'statistic_month' ) { ?>
 										<span class="dashicons dashicons-arrow-<?php echo $order === 'ASC' ? 'up' : 'down'; ?>"></span>
-									<?php endif; ?>
+									<?php } ?>
 								</a>
 							</th>
 							<th class="sortable-column">
-								<a href="<?php echo esc_url( add_query_arg( array( 'orderby' => 'taxonomy', 'order' => $next_order ), $base_url ) ); ?>">
+								<a href="
+								<?php
+								echo esc_url(
+									add_query_arg(
+										array(
+											'orderby' => 'taxonomy',
+											'order'   => $next_order,
+										),
+										$base_url 
+									) 
+								);
+								?>
+											">
 									<?php esc_html_e( 'Taxonomy', 'gatherpress-statistics' ); ?>
-									<?php if ( $order_by === 'taxonomy' ) : ?>
+									<?php if ( $order_by === 'taxonomy' ) { ?>
 										<span class="dashicons dashicons-arrow-<?php echo $order === 'ASC' ? 'up' : 'down'; ?>"></span>
-									<?php endif; ?>
+									<?php } ?>
 								</a>
 							</th>
 							<th class="sortable-column">
-								<a href="<?php echo esc_url( add_query_arg( array( 'orderby' => 'term', 'order' => $next_order ), $base_url ) ); ?>">
+								<a href="
+								<?php
+								echo esc_url(
+									add_query_arg(
+										array(
+											'orderby' => 'term',
+											'order'   => $next_order,
+										),
+										$base_url 
+									) 
+								);
+								?>
+											">
 									<?php esc_html_e( 'Term', 'gatherpress-statistics' ); ?>
-									<?php if ( $order_by === 'term' ) : ?>  
+									<?php if ( $order_by === 'term' ) { ?>  
 										<span class="dashicons dashicons-arrow-<?php echo $order === 'ASC' ? 'up' : 'down'; ?>"></span>
-									<?php endif; ?>
+									<?php } ?>
 								</a>
 							</th>
 							<th>
-								<a href="<?php echo esc_url( add_query_arg( array( 'orderby' => 'statistic_value', 'order' => $next_order ), $base_url ) ); ?>">
+								<a href="
+								<?php
+								echo esc_url(
+									add_query_arg(
+										array(
+											'orderby' => 'statistic_value',
+											'order'   => $next_order,
+										),
+										$base_url 
+									) 
+								);
+								?>
+								">
 									<?php esc_html_e( 'Value', 'gatherpress-statistics' ); ?>
-									<?php if ( $order_by === 'statistic_value' ) : ?>
+									<?php if ( $order_by === 'statistic_value' ) { ?>
 										<span class="dashicons dashicons-arrow-<?php echo $order === 'ASC' ? 'up' : 'down'; ?>"></span>
-									<?php endif; ?>
+									<?php } ?>
 								</a>
 							</th>
 							<th>
-								<a href="<?php echo esc_url( add_query_arg( array( 'orderby' => 'archived_at', 'order' => $next_order ), $base_url ) ); ?>">
+								<a href="
+								<?php
+								echo esc_url(
+									add_query_arg(
+										array(
+											'orderby' => 'archived_at',
+											'order'   => $next_order,
+										),
+										$base_url 
+									) 
+								);
+								?>
+								">
 									<?php esc_html_e( 'Archived', 'gatherpress-statistics' ); ?>
-									<?php if ( $order_by === 'archived_at' ) : ?>
+									<?php if ( $order_by === 'archived_at' ) { ?>
 										<span class="dashicons dashicons-arrow-<?php echo $order === 'ASC' ? 'up' : 'down'; ?>"></span>
-									<?php endif; ?>
+									<?php } ?>
 								</a>
 							</th>
 						</tr>
@@ -2463,41 +2551,44 @@ class AdminPage {
 					<tbody>
 						<?php 
 						if ( in_array( $order_by, array( 'taxonomy', 'term' ), true ) ) {
-							usort( $statistics, function( $a, $b ) use ( $order_by, $order ) {
-								$filters_a = json_decode( $a->filters_data, true );
-								$filters_b = json_decode( $b->filters_data, true );
+							usort(
+								$statistics,
+								function ( $a, $b ) use ( $order_by, $order ) {
+									$filters_a = json_decode( $a->filters_data, true );
+									$filters_b = json_decode( $b->filters_data, true );
 								
-								if ( 'taxonomy' === $order_by ) {
-									$val_a = isset( $filters_a['taxonomy'] ) ? $filters_a['taxonomy'] : '';
-									$val_b = isset( $filters_b['taxonomy'] ) ? $filters_b['taxonomy'] : '';
-								} else {
-									$val_a = '';
-									$val_b = '';
+									if ( 'taxonomy' === $order_by ) {
+										$val_a = isset( $filters_a['taxonomy'] ) ? $filters_a['taxonomy'] : '';
+										$val_b = isset( $filters_b['taxonomy'] ) ? $filters_b['taxonomy'] : '';
+									} else {
+										$val_a = '';
+										$val_b = '';
 									
-									if ( isset( $filters_a['term_id'] ) ) {
-										$term = get_term( $filters_a['term_id'] );
-										if ( $term && ! is_wp_error( $term ) ) {
-											$val_a = $term->name;
+										if ( isset( $filters_a['term_id'] ) ) {
+											$term = get_term( $filters_a['term_id'] );
+											if ( $term && ! is_wp_error( $term ) ) {
+												$val_a = $term->name;
+											}
+										}
+									
+										if ( isset( $filters_b['term_id'] ) ) {
+											$term = get_term( $filters_b['term_id'] );
+											if ( $term && ! is_wp_error( $term ) ) {
+												$val_b = $term->name;
+											}
 										}
 									}
-									
-									if ( isset( $filters_b['term_id'] ) ) {
-										$term = get_term( $filters_b['term_id'] );
-										if ( $term && ! is_wp_error( $term ) ) {
-											$val_b = $term->name;
-										}
-									}
-								}
 								
-								$result = strcasecmp( $val_a, $val_b );
-								return ( 'ASC' === $order ) ? $result : -$result;
-							} );
+									$result = strcasecmp( $val_a, $val_b );
+									return ( 'ASC' === $order ) ? $result : -$result;
+								} 
+							);
 						}
 						
-						foreach ( $statistics as $stat ) : 
-							$filters = json_decode( $stat->filters_data, true );
+						foreach ( $statistics as $stat ) { 
+							$filters       = json_decode( $stat->filters_data, true );
 							$taxonomy_name = '';
-							$term_name = '';
+							$term_name     = '';
 							
 							if ( isset( $filters['taxonomy'] ) ) {
 								$tax_obj = get_taxonomy( $filters['taxonomy'] );
@@ -2512,7 +2603,7 @@ class AdminPage {
 									$term_name = $term->name;
 								}
 							}
-						?>
+							?>
 							<tr>
 								<td><?php echo esc_html( $stat->statistic_year ); ?></td>
 								<td><?php echo esc_html( date_i18n( 'F', mktime( 0, 0, 0, $stat->statistic_month, 1 ) ) ); ?></td>
@@ -2521,10 +2612,10 @@ class AdminPage {
 								<td><strong><?php echo esc_html( number_format_i18n( $stat->statistic_value ) ); ?></strong></td>
 								<td><?php echo esc_html( date_i18n( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), strtotime( $stat->archived_at ) ) ); ?></td>
 							</tr>
-						<?php endforeach; ?>
+						<?php } ?>
 					</tbody>
 				</table>
-			<?php endif; ?>
+			<?php } ?>
 		</div>
 		<?php
 	}
@@ -2578,7 +2669,7 @@ class Archive {
 	 * @return void
 	 */
 	public function archive_monthly_statistics(): void {
-		$current_year = (int) date( 'Y' );
+		$current_year  = (int) date( 'Y' );
 		$current_month = (int) date( 'n' );
 		
 		$this->archive_statistics_for_month( $current_year, $current_month );
@@ -2597,7 +2688,7 @@ class Archive {
 	public function archive_statistics_for_month( int $year, int $month ): bool {
 		global $wpdb;
 		
-		$table_name = $wpdb->prefix . 'gatherpress_statistics_archive';
+		$table_name   = $wpdb->prefix . 'gatherpress_statistics_archive';
 		$current_time = current_time( 'mysql' );
 		
 		$configs = Cache::get_instance()->get_common_configs();
@@ -2607,8 +2698,8 @@ class Archive {
 		}
 
 		$success_count = 0;
-		$post_types = Support::get_instance()->get_supported_post_types();
-		$post_type = ! empty( $post_types ) ? $post_types[0] : 'gatherpress_event';
+		$post_types    = Support::get_instance()->get_supported_post_types();
+		$post_type     = ! empty( $post_types ) ? $post_types[0] : 'gatherpress_event';
 		
 		foreach ( $configs as $config ) {
 			if ( ! isset( $config['type'] ) || ! isset( $config['filters'] ) ) {
@@ -2617,12 +2708,15 @@ class Archive {
 			
 			$config['filters']['event_query'] = 'past';
 			
-			$filters_with_date = array_merge( $config['filters'], array(
-				'year'  => $year,
-				'month' => $month,
-			) );
+			$filters_with_date = array_merge(
+				$config['filters'],
+				array(
+					'year'  => $year,
+					'month' => $month,
+				) 
+			);
 			
-			$value = Statistics::get_instance()->calculate( $config['type'], $filters_with_date );
+			$value        = Statistics::get_instance()->calculate( $config['type'], $filters_with_date );
 			$filters_hash = md5( wp_json_encode( $config['filters'] ) );
 			
 			$exists = $wpdb->get_var(
@@ -2670,7 +2764,7 @@ class Archive {
 			}
 
 			if ( false !== $result ) {
-				$success_count++;
+				++$success_count;
 			}
 		}
 

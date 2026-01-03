@@ -113,11 +113,17 @@ $display_label = ( 1 === $count ) ? $label_singular : $label_plural;
 	<data class="gatherpress-stats-value" value="<?php echo esc_attr( (string) $count ); ?>">
 		<?php 
 		if ( ! empty( $display_prefix ) ) {
-			?><span class="gatherpress-stats-prefix"><?php echo esc_html( $display_prefix ); ?></span> <?php
+			?>
+			<span class="gatherpress-stats-prefix"><?php echo esc_html( $display_prefix ); ?></span> 
+			<?php
 		}
-		?><span class="gatherpress-stats-number"><?php echo esc_html( number_format_i18n( $count ) ); ?></span><?php
+		?>
+		<span class="gatherpress-stats-number"><?php echo esc_html( number_format_i18n( $count ) ); ?></span>
+		<?php
 		if ( ! empty( $display_suffix ) ) {
-			?> <span class="gatherpress-stats-suffix"><?php echo esc_html( $display_suffix ); ?></span><?php
+			?>
+			<span class="gatherpress-stats-suffix"><?php echo esc_html( $display_suffix ); ?></span>
+			<?php
 		}
 		?>
 	</data>
