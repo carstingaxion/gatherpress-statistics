@@ -12,6 +12,7 @@ import { __, sprintf } from '@wordpress/i18n';
  * @see https://developer.wordpress.org/block-editor/reference-guides/packages/packages-block-editor/#useblockprops
  */
 import { useBlockProps, InspectorControls } from '@wordpress/block-editor';
+/* eslint-disable @wordpress/no-unsafe-wp-apis */
 import {
 	PanelBody,
 	SelectControl,
@@ -21,10 +22,8 @@ import {
 	__experimentalNumberControl as NumberControl,
 	Notice,
 } from '@wordpress/components';
-import { useSelect } from '@wordpress/data';
+import { useSelect, useDispatch } from '@wordpress/data';
 import { useEffect, useState } from '@wordpress/element';
-import { createBlock } from '@wordpress/blocks';
-import { useDispatch } from '@wordpress/data';
 import apiFetch from '@wordpress/api-fetch';
 
 /**
@@ -40,12 +39,28 @@ import './editor.scss';
  * editor. This represents what the editor will render when the block is used.
  *
  * @see https://developer.wordpress.org/block-editor/reference-guides/block-api/block-edit-save/#edit
- * @param          props.attributes
- * @param          props.setAttributes
- * @param          props.clientId
  *
- * @param {Object} props               Block properties.
- * @return {Element} Element to render.
+ * @param {Object}   props               - Component props.
+ * @param {Object}   props.attributes    - Block attributes containing:
+ *                                       - {string} statisticType - Type of statistic to display
+ *                                       - {string} labelSingular - Singular label for the statistic
+ *                                       - {string} labelPlural - Plural label for the statistic
+ *                                       - {Object} selectedTaxonomyTerms - Selected terms for multi-taxonomy filter
+ *                                       - {number} selectedTerm - Selected term ID for single taxonomy filter
+ *                                       - {string} selectedTaxonomy - Selected taxonomy slug for single taxonomy filter
+ *                                       - {string} countTaxonomy - Taxonomy slug to count terms from
+ *                                       - {string} filterTaxonomy - Taxonomy slug to filter by
+ *                                       - {string} eventQuery - Event query type ('upcoming' or 'past')
+ *                                       - {boolean} showLabel - Whether to show the label
+ *                                       - {string} prefixDefault - Default prefix text
+ *                                       - {string} suffixDefault - Default suffix text
+ *                                       - {string} prefixConditional - Conditional prefix text
+ *                                       - {string} suffixConditional - Conditional suffix text
+ *                                       - {number} conditionalThreshold - Threshold for conditional prefix/suffix
+ * @param {Function} props.setAttributes - Function to update block attributes.
+ * @param {Object}   props.clientId      - Unique client ID for the block instance.
+ *
+ * @return {Element} React element rendered in the editor.
  */
 export default function Edit( { attributes, setAttributes, clientId } ) {
 	const {
@@ -114,14 +129,12 @@ export default function Edit( { attributes, setAttributes, clientId } ) {
 			if ( eventQuery !== 'past' ) {
 				setAttributes( { eventQuery: 'past' } );
 			}
-		} else {
 			// For other types, ensure eventQuery has a valid value
-			if (
-				! eventQuery ||
-				! [ 'upcoming', 'past' ].includes( eventQuery )
-			) {
-				setAttributes( { eventQuery: 'past' } );
-			}
+		} else if (
+			! eventQuery ||
+			! [ 'upcoming', 'past' ].includes( eventQuery )
+		) {
+			setAttributes( { eventQuery: 'past' } );
 		}
 	}, [ statisticType, eventQuery, setAttributes ] );
 
@@ -226,14 +239,20 @@ export default function Edit( { attributes, setAttributes, clientId } ) {
 					} else {
 						blockName = sprintf(
 							/* translators: %s: plural post type label */
-							__( '%s (Multiple Taxonomies)', 'gatherpress-statistics' ),
+							__(
+								'%s (Multiple Taxonomies)',
+								'gatherpress-statistics'
+							),
 							labelPlural
 						);
 					}
 				} else {
 					blockName = sprintf(
 						/* translators: %s: plural post type label */
-						__( '%s (Multiple Taxonomies)', 'gatherpress-statistics' ),
+						__(
+							'%s (Multiple Taxonomies)',
+							'gatherpress-statistics'
+						),
 						labelPlural
 					);
 				}
@@ -276,7 +295,10 @@ export default function Edit( { attributes, setAttributes, clientId } ) {
 					if ( countTax && filterTax && term ) {
 						blockName = sprintf(
 							/* translators: 1: count taxonomy name, 2: filter taxonomy name, 3: term name */
-							__( '%1$s in %2$s: %3$s', 'gatherpress-statistics' ),
+							__(
+								'%1$s in %2$s: %3$s',
+								'gatherpress-statistics'
+							),
 							countTax.name,
 							filterTax.name,
 							term.name
@@ -302,27 +324,18 @@ export default function Edit( { attributes, setAttributes, clientId } ) {
 		}
 
 		// CRITICAL: For total_attendees, always add "Past:" prefix since it only shows past events
-		if ( statisticType === 'total_attendees' ) {
+		if ( statisticType === 'total_attendees' || eventQuery === 'past' ) {
 			blockName = sprintf(
 				/* translators: %s: statistic name */
 				__( 'Past: %s', 'gatherpress-statistics' ),
 				blockName
 			);
-		} else {
-			// For other types, add event query type to name
-			if ( eventQuery === 'upcoming' ) {
-				blockName = sprintf(
-					/* translators: %s: statistic name */
-					__( 'Upcoming: %s', 'gatherpress-statistics' ),
-					blockName
-				);
-			} else if ( eventQuery === 'past' ) {
-				blockName = sprintf(
-					/* translators: %s: statistic name */
-					__( 'Past: %s', 'gatherpress-statistics' ),
-					blockName
-				);
-			}
+		} else if ( eventQuery === 'upcoming' ) {
+			blockName = sprintf(
+				/* translators: %s: statistic name */
+				__( 'Upcoming: %s', 'gatherpress-statistics' ),
+				blockName
+			);
 		}
 
 		// Update the block's metadata name
@@ -716,7 +729,7 @@ export default function Edit( { attributes, setAttributes, clientId } ) {
 																( t ) =>
 																	t.id ===
 																	selectedTerm
-																)?.name,
+															)?.name,
 													  ].filter( Boolean )
 													: []
 											}
@@ -732,7 +745,7 @@ export default function Edit( { attributes, setAttributes, clientId } ) {
 															( t ) =>
 																t.name ===
 																tokens[ 0 ]
-															);
+														);
 													if ( term ) {
 														setAttributes( {
 															selectedTerm:
