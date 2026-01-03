@@ -75,13 +75,8 @@ class Plugin {
 	private function setup_hooks(): void {
 		add_action( 'registered_post_type_gatherpress_event', array( Setup::get_instance(), 'register_post_type_support' ) );
 		add_action( 'init', array( Setup::get_instance(), 'block_init' ) );
-		add_action( 'init', array( Database::get_instance(), 'create_archive_table' ) );
 		add_action( 'rest_api_init', array( RestApi::get_instance(), 'register_rest_routes' ) );
-		add_action( 'admin_menu', array( AdminPage::get_instance(), 'register_admin_page' ) );
-		add_action( 'admin_init', array( AdminPage::get_instance(), 'handle_manual_archive_generation' ) );
-		add_action( 'admin_enqueue_scripts', array( AdminPage::get_instance(), 'enqueue_admin_assets' ) );
 		add_action( 'gatherpress_statistics_regenerate_cache', array( Cache::get_instance(), 'pregenerate_cache' ) );
-		add_action( 'gatherpress_statistics_monthly_archive', array( Archive::get_instance(), 'archive_monthly_statistics' ) );
 		add_action( 'transition_post_status', array( CacheInvalidation::get_instance(), 'clear_cache_on_status_change' ), 10, 3 );
 		add_action( 'updated_post_meta', array( CacheInvalidation::get_instance(), 'clear_cache_on_meta_update' ), 10, 3 );
 		add_action( 'added_post_meta', array( CacheInvalidation::get_instance(), 'clear_cache_on_meta_update' ), 10, 3 );
@@ -91,6 +86,33 @@ class Plugin {
 		add_action( 'delete_term', array( CacheInvalidation::get_instance(), 'clear_cache_on_term_change' ), 10, 3 );
 		add_action( 'set_object_terms', array( CacheInvalidation::get_instance(), 'clear_cache_on_term_relationship' ), 10, 3 );
 		add_filter( 'posts_where', array( QueryFilters::get_instance(), 'filter_gatherpress_event_dates' ), 10, 2 );
+		
+		// Only setup archive functionality if enabled
+		if ( $this->is_archive_enabled() ) {
+			add_action( 'init', array( Database::get_instance(), 'create_archive_table' ) );
+			add_action( 'admin_menu', array( AdminPage::get_instance(), 'register_admin_page' ) );
+			add_action( 'admin_init', array( AdminPage::get_instance(), 'handle_manual_archive_generation' ) );
+			add_action( 'admin_enqueue_scripts', array( AdminPage::get_instance(), 'enqueue_admin_assets' ) );
+			add_action( 'gatherpress_statistics_monthly_archive', array( Archive::get_instance(), 'archive_monthly_statistics' ) );
+		}
+	}
+	
+	/**
+	 * Check if archive functionality is enabled.
+	 *
+	 * @since 0.1.0
+	 *
+	 * @return bool True if archive is enabled.
+	 */
+	public function is_archive_enabled(): bool {
+		/**
+		 * Filter whether archive functionality is enabled.
+		 *
+		 * @since 0.1.0
+		 *
+		 * @param bool $enabled Whether archive is enabled. Default true.
+		 */
+		return (bool) apply_filters( 'gatherpress_statistics_enable_archive', true );
 	}
 }
 
@@ -242,6 +264,54 @@ class Database {
 		
 		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 		dbDelta( $sql );
+	}
+	
+	/**
+	 * Get archive data for a specific statistic.
+	 *
+	 * @since 0.1.0
+	 *
+	 * @global \wpdb $wpdb WordPress database abstraction object.
+	 * @param string               $statistic_type Statistic type.
+	 * @param array<string, mixed> $filters        Filters including year and month.
+	 * @return int|null Statistic value or null if not found.
+	 */
+	public function get_archive_statistic( string $statistic_type, array $filters ): ?int {
+		global $wpdb;
+		
+		if ( empty( $filters['year'] ) || empty( $filters['month'] ) ) {
+			return null;
+		}
+		
+		$table_name = $wpdb->prefix . 'gatherpress_statistics_archive';
+		
+		// Remove year and month from filters for hash calculation
+		$filter_copy = $filters;
+		unset( $filter_copy['year'], $filter_copy['month'] );
+		$filters_hash = md5( wp_json_encode( $filter_copy ) );
+		
+		$post_types = Support::get_instance()->get_supported_post_types();
+		$post_type = ! empty( $post_types ) ? $post_types[0] : 'gatherpress_event';
+		
+		$result = $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT statistic_value FROM {$table_name}
+				 WHERE post_type = %s
+				 AND statistic_type = %s
+				 AND statistic_year = %d
+				 AND statistic_month = %d
+				 AND filters_hash = %s
+				 ORDER BY archived_at DESC
+				 LIMIT 1",
+				$post_type,
+				$statistic_type,
+				$filters['year'],
+				$filters['month'],
+				$filters_hash
+			)
+		);
+		
+		return $result !== null ? (int) $result : null;
 	}
 }
 
@@ -666,6 +736,14 @@ class Cache {
 		
 		if ( ! Support::get_instance()->is_statistic_type_supported( $statistic_type ) ) {
 			return 0;
+		}
+		
+		// Check if archive is enabled and we have year/month filters
+		if ( Plugin::get_instance()->is_archive_enabled() && ! empty( $filters['year'] ) && ! empty( $filters['month'] ) ) {
+			$archive_value = Database::get_instance()->get_archive_statistic( $statistic_type, $filters );
+			if ( $archive_value !== null ) {
+				return $archive_value;
+			}
 		}
 
 		$expiration = $this->get_cache_expiration();
@@ -2359,7 +2437,7 @@ class AdminPage {
 							<th class="sortable-column">
 								<a href="<?php echo esc_url( add_query_arg( array( 'orderby' => 'term', 'order' => $next_order ), $base_url ) ); ?>">
 									<?php esc_html_e( 'Term', 'gatherpress-statistics' ); ?>
-									<?php if ( $order_by === 'term' ) : ?>
+									<?php if ( $order_by === 'term' ) : ?>  
 										<span class="dashicons dashicons-arrow-<?php echo $order === 'ASC' ? 'up' : 'down'; ?>"></span>
 									<?php endif; ?>
 								</a>
@@ -2612,20 +2690,22 @@ class Archive {
  * @return void
  */
 function activate_plugin(): void {
-	Database::get_instance()->create_archive_table();
+	if ( Plugin::get_instance()->is_archive_enabled() ) {
+		Database::get_instance()->create_archive_table();
+		
+		if ( ! wp_next_scheduled( 'gatherpress_statistics_monthly_archive' ) ) {
+			wp_schedule_event(
+				strtotime( 'first day of next month midnight' ),
+				'monthly',
+				'gatherpress_statistics_monthly_archive'
+			);
+		}
+	}
 	
 	if ( ! wp_next_scheduled( 'gatherpress_statistics_regenerate_cache' ) ) {
 		wp_schedule_single_event(
 			time() + 5,
 			'gatherpress_statistics_regenerate_cache'
-		);
-	}
-	
-	if ( ! wp_next_scheduled( 'gatherpress_statistics_monthly_archive' ) ) {
-		wp_schedule_event(
-			strtotime( 'first day of next month midnight' ),
-			'monthly',
-			'gatherpress_statistics_monthly_archive'
 		);
 	}
 }
@@ -2653,9 +2733,11 @@ function deactivate_plugin(): void {
 		wp_unschedule_event( $scheduled, 'gatherpress_statistics_regenerate_cache' );
 	}
 	
-	$scheduled_monthly = wp_next_scheduled( 'gatherpress_statistics_monthly_archive' );
-	if ( $scheduled_monthly ) {
-		wp_unschedule_event( $scheduled_monthly, 'gatherpress_statistics_monthly_archive' );
+	if ( Plugin::get_instance()->is_archive_enabled() ) {
+		$scheduled_monthly = wp_next_scheduled( 'gatherpress_statistics_monthly_archive' );
+		if ( $scheduled_monthly ) {
+			wp_unschedule_event( $scheduled_monthly, 'gatherpress_statistics_monthly_archive' );
+		}
 	}
 }
 register_deactivation_hook( __FILE__, __NAMESPACE__ . '\deactivate_plugin' );
