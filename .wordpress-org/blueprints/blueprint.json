@@ -5,9 +5,6 @@
     "php": "8.2",
     "wp": "latest"
   },
-  "phpExtensionBundles": [
-    "kitchen-sink"
-  ],
   "features": {
     "networking": true
   },
@@ -33,8 +30,7 @@
     },
     {
       "step": "login",
-      "username": "admin",
-      "password": "password"
+      "username": "admin"
     },
     {
       "step": "updateUserMeta",
@@ -45,7 +41,7 @@
     },
     {
       "step": "installPlugin",
-      "pluginZipFile": {
+      "pluginData": {
           "resource": "wordpress.org\/plugins",
           "slug": "gatherpress"
       },
@@ -55,12 +51,16 @@
     },
     {
       "step": "installPlugin",
-      "pluginZipFile": {
-        "resource": "url",
-        "url": "https://github-proxy.com/proxy/?repo=carstingaxion/gatherpress-statistics"
+      "pluginData": {
+        "resource": "git:directory",
+        "url": "https://github.com/carstingaxion/gatherpress-statistics",
+        "ref": "HEAD"
       },
       "options": {
-          "activate": true
+        "activate": true
+      },
+      "progress": {
+        "caption": "Installing plugin from GitHub: carstingaxion/gatherpress-statistics"
       }
     },
     {
