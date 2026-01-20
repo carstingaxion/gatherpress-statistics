@@ -35,14 +35,6 @@
             "url": "https://wpackagist.org"
         }
     ],
-    "autoload": {
-        "classmap": [
-            "includes/"
-        ],
-        "files": [
-            "includes/class-setup.php"
-        ]
-    },
     "config": {
         "allow-plugins": {
             "composer/installers": true,
