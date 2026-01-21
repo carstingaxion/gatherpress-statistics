@@ -644,19 +644,7 @@ The plugin uses a smart cache invalidation system that balances freshness with p
 
 ## Changelog
 
-###  0.1.0
-* Initial release
-* Support GatherPress post types & with any taxonomies
-* Filtering for upcoming or past events
-* Smart caching system with automatic invalidation
-* Scheduled cache regeneration system
-* Four display style variations including animated Confetti style
-* Full theme.json integration
-* Comprehensive taxonomy filtering
-* Attendee count statistics
-* Conditional prefix/suffix formatting
-* Comprehensive documentation and developer hooks
-* Semantic HTML structure with `<figure>`, `<data>`, and `<figcaption>` elements
+All notable changes to this project will be documented in the [CHANGELOG.md](CHANGELOG.md).
 
 
 ## Privacy & Data
