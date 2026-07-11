@@ -32,13 +32,11 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _wordpress_data__WEBPACK_IMPORTED_MODULE_3___default = /*#__PURE__*/__webpack_require__.n(_wordpress_data__WEBPACK_IMPORTED_MODULE_3__);
 /* harmony import */ var _wordpress_element__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! @wordpress/element */ "@wordpress/element");
 /* harmony import */ var _wordpress_element__WEBPACK_IMPORTED_MODULE_4___default = /*#__PURE__*/__webpack_require__.n(_wordpress_element__WEBPACK_IMPORTED_MODULE_4__);
-/* harmony import */ var _wordpress_blocks__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! @wordpress/blocks */ "@wordpress/blocks");
-/* harmony import */ var _wordpress_blocks__WEBPACK_IMPORTED_MODULE_5___default = /*#__PURE__*/__webpack_require__.n(_wordpress_blocks__WEBPACK_IMPORTED_MODULE_5__);
-/* harmony import */ var _wordpress_api_fetch__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! @wordpress/api-fetch */ "@wordpress/api-fetch");
-/* harmony import */ var _wordpress_api_fetch__WEBPACK_IMPORTED_MODULE_6___default = /*#__PURE__*/__webpack_require__.n(_wordpress_api_fetch__WEBPACK_IMPORTED_MODULE_6__);
-/* harmony import */ var _editor_scss__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! ./editor.scss */ "./src/editor.scss");
-/* harmony import */ var react_jsx_runtime__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! react/jsx-runtime */ "react/jsx-runtime");
-/* harmony import */ var react_jsx_runtime__WEBPACK_IMPORTED_MODULE_8___default = /*#__PURE__*/__webpack_require__.n(react_jsx_runtime__WEBPACK_IMPORTED_MODULE_8__);
+/* harmony import */ var _wordpress_api_fetch__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! @wordpress/api-fetch */ "@wordpress/api-fetch");
+/* harmony import */ var _wordpress_api_fetch__WEBPACK_IMPORTED_MODULE_5___default = /*#__PURE__*/__webpack_require__.n(_wordpress_api_fetch__WEBPACK_IMPORTED_MODULE_5__);
+/* harmony import */ var _editor_scss__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! ./editor.scss */ "./src/editor.scss");
+/* harmony import */ var react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! react/jsx-runtime */ "react/jsx-runtime");
+/* harmony import */ var react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7___default = /*#__PURE__*/__webpack_require__.n(react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__);
 /**
  * Retrieves the translation of text.
  *
@@ -53,8 +51,7 @@ __webpack_require__.r(__webpack_exports__);
  * @see https://developer.wordpress.org/block-editor/reference-guides/packages/packages-block-editor/#useblockprops
  */
 
-
-
+/* eslint-disable @wordpress/no-unsafe-wp-apis */
 
 
 
@@ -73,12 +70,28 @@ __webpack_require__.r(__webpack_exports__);
  * editor. This represents what the editor will render when the block is used.
  *
  * @see https://developer.wordpress.org/block-editor/reference-guides/block-api/block-edit-save/#edit
- * @param          props.attributes
- * @param          props.setAttributes
- * @param          props.clientId
  *
- * @param {Object} props               Block properties.
- * @return {Element} Element to render.
+ * @param {Object}   props               - Component props.
+ * @param {Object}   props.attributes    - Block attributes containing:
+ *                                       - {string} statisticType - Type of statistic to display
+ *                                       - {string} labelSingular - Singular label for the statistic
+ *                                       - {string} labelPlural - Plural label for the statistic
+ *                                       - {Object} selectedTaxonomyTerms - Selected terms for multi-taxonomy filter
+ *                                       - {number} selectedTerm - Selected term ID for single taxonomy filter
+ *                                       - {string} selectedTaxonomy - Selected taxonomy slug for single taxonomy filter
+ *                                       - {string} countTaxonomy - Taxonomy slug to count terms from
+ *                                       - {string} filterTaxonomy - Taxonomy slug to filter by
+ *                                       - {string} eventQuery - Event query type ('upcoming' or 'past')
+ *                                       - {boolean} showLabel - Whether to show the label
+ *                                       - {string} prefixDefault - Default prefix text
+ *                                       - {string} suffixDefault - Default suffix text
+ *                                       - {string} prefixConditional - Conditional prefix text
+ *                                       - {string} suffixConditional - Conditional suffix text
+ *                                       - {number} conditionalThreshold - Threshold for conditional prefix/suffix
+ * @param {Function} props.setAttributes - Function to update block attributes.
+ * @param {Object}   props.clientId      - Unique client ID for the block instance.
+ *
+ * @return {Element} React element rendered in the editor.
  */
 
 function Edit({
@@ -119,7 +132,7 @@ function Edit({
   // Fetch filtered taxonomies from REST API
   (0,_wordpress_element__WEBPACK_IMPORTED_MODULE_4__.useEffect)(() => {
     setIsLoadingTaxonomies(true);
-    _wordpress_api_fetch__WEBPACK_IMPORTED_MODULE_6___default()({
+    _wordpress_api_fetch__WEBPACK_IMPORTED_MODULE_5___default()({
       path: '/gatherpress-statistics/v1/taxonomies'
     }).then(taxonomies => {
       setFilteredTaxonomies(taxonomies);
@@ -133,7 +146,7 @@ function Edit({
   // Fetch supported statistic types from REST API
   (0,_wordpress_element__WEBPACK_IMPORTED_MODULE_4__.useEffect)(() => {
     setIsLoadingTypes(true);
-    _wordpress_api_fetch__WEBPACK_IMPORTED_MODULE_6___default()({
+    _wordpress_api_fetch__WEBPACK_IMPORTED_MODULE_5___default()({
       path: '/gatherpress-statistics/v1/supported-types'
     }).then(types => {
       setSupportedTypes(types);
@@ -153,13 +166,11 @@ function Edit({
           eventQuery: 'past'
         });
       }
-    } else {
       // For other types, ensure eventQuery has a valid value
-      if (!eventQuery || !['upcoming', 'past'].includes(eventQuery)) {
-        setAttributes({
-          eventQuery: 'past'
-        });
-      }
+    } else if (!eventQuery || !['upcoming', 'past'].includes(eventQuery)) {
+      setAttributes({
+        eventQuery: 'past'
+      });
     }
   }, [statisticType, eventQuery, setAttributes]);
 
@@ -271,18 +282,12 @@ function Edit({
     }
 
     // CRITICAL: For total_attendees, always add "Past:" prefix since it only shows past events
-    if (statisticType === 'total_attendees') {
+    if (statisticType === 'total_attendees' || eventQuery === 'past') {
       blockName = (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_0__.sprintf)(/* translators: %s: statistic name */
       (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_0__.__)('Past: %s', 'gatherpress-statistics'), blockName);
-    } else {
-      // For other types, add event query type to name
-      if (eventQuery === 'upcoming') {
-        blockName = (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_0__.sprintf)(/* translators: %s: statistic name */
-        (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_0__.__)('Upcoming: %s', 'gatherpress-statistics'), blockName);
-      } else if (eventQuery === 'past') {
-        blockName = (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_0__.sprintf)(/* translators: %s: statistic name */
-        (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_0__.__)('Past: %s', 'gatherpress-statistics'), blockName);
-      }
+    } else if (eventQuery === 'upcoming') {
+      blockName = (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_0__.sprintf)(/* translators: %s: statistic name */
+      (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_0__.__)('Upcoming: %s', 'gatherpress-statistics'), blockName);
     }
 
     // Update the block's metadata name
@@ -348,15 +353,15 @@ function Edit({
   const displayPrefix = useConditional && prefixConditional ? prefixConditional : prefixDefault;
   const displaySuffix = useConditional && suffixConditional ? suffixConditional : suffixDefault;
   const displayLabel = previewCount === 1 ? labelSingular : labelPlural;
-  return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_8__.jsxs)(react_jsx_runtime__WEBPACK_IMPORTED_MODULE_8__.Fragment, {
-    children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_8__.jsxs)(_wordpress_block_editor__WEBPACK_IMPORTED_MODULE_1__.InspectorControls, {
-      children: [!isLoadingTypes && !isCurrentTypeSupported && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_8__.jsx)(_wordpress_components__WEBPACK_IMPORTED_MODULE_2__.Notice, {
+  return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsxs)(react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.Fragment, {
+    children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsxs)(_wordpress_block_editor__WEBPACK_IMPORTED_MODULE_1__.InspectorControls, {
+      children: [!isLoadingTypes && !isCurrentTypeSupported && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)(_wordpress_components__WEBPACK_IMPORTED_MODULE_2__.Notice, {
         status: "warning",
         isDismissible: false,
         children: (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_0__.__)('This statistic type is currently disabled. Enable it in your theme or plugin to use this block.', 'gatherpress-statistics')
-      }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_8__.jsxs)(_wordpress_components__WEBPACK_IMPORTED_MODULE_2__.PanelBody, {
+      }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsxs)(_wordpress_components__WEBPACK_IMPORTED_MODULE_2__.PanelBody, {
         title: (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_0__.__)('Statistic Settings', 'gatherpress-statistics'),
-        children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_8__.jsx)(_wordpress_components__WEBPACK_IMPORTED_MODULE_2__.SelectControl, {
+        children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)(_wordpress_components__WEBPACK_IMPORTED_MODULE_2__.SelectControl, {
           label: (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_0__.__)('Statistic Type', 'gatherpress-statistics'),
           value: statisticType,
           options: statisticTypeOptions,
@@ -380,7 +385,7 @@ function Edit({
             }
           },
           disabled: isLoadingTypes
-        }), showEventQueryFilter && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_8__.jsx)(_wordpress_components__WEBPACK_IMPORTED_MODULE_2__.ToggleControl, {
+        }), showEventQueryFilter && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)(_wordpress_components__WEBPACK_IMPORTED_MODULE_2__.ToggleControl, {
           label: (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_0__.__)('Upcoming Events', 'gatherpress-statistics'),
           checked: eventQuery === 'upcoming',
           onChange: value => setAttributes({
@@ -389,21 +394,21 @@ function Edit({
           help: eventQuery === 'upcoming' ? (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_0__.sprintf)(/* translators: %s: plural post type label */
           (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_0__.__)('Showing statistics for upcoming %s', 'gatherpress-statistics'), labelPlural.toLowerCase()) : (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_0__.sprintf)(/* translators: %s: plural post type label */
           (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_0__.__)('Showing statistics for past %s', 'gatherpress-statistics'), labelPlural.toLowerCase())
-        }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_8__.jsx)(_wordpress_components__WEBPACK_IMPORTED_MODULE_2__.ToggleControl, {
+        }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)(_wordpress_components__WEBPACK_IMPORTED_MODULE_2__.ToggleControl, {
           label: (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_0__.__)('Show Label', 'gatherpress-statistics'),
           checked: showLabel,
           onChange: value => setAttributes({
             showLabel: value
           })
-        }), showLabel && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_8__.jsxs)(react_jsx_runtime__WEBPACK_IMPORTED_MODULE_8__.Fragment, {
-          children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_8__.jsx)(_wordpress_components__WEBPACK_IMPORTED_MODULE_2__.TextControl, {
+        }), showLabel && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsxs)(react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.Fragment, {
+          children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)(_wordpress_components__WEBPACK_IMPORTED_MODULE_2__.TextControl, {
             label: (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_0__.__)('Label (Singular)', 'gatherpress-statistics'),
             value: labelSingular,
             onChange: value => setAttributes({
               labelSingular: value
             }),
             help: (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_0__.__)('Used when count is 1', 'gatherpress-statistics')
-          }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_8__.jsx)(_wordpress_components__WEBPACK_IMPORTED_MODULE_2__.TextControl, {
+          }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)(_wordpress_components__WEBPACK_IMPORTED_MODULE_2__.TextControl, {
             label: (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_0__.__)('Label (Plural)', 'gatherpress-statistics'),
             value: labelPlural,
             onChange: value => setAttributes({
@@ -412,24 +417,24 @@ function Edit({
             help: (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_0__.__)('Used when count is greater than 1', 'gatherpress-statistics')
           })]
         })]
-      }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_8__.jsxs)(_wordpress_components__WEBPACK_IMPORTED_MODULE_2__.PanelBody, {
+      }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsxs)(_wordpress_components__WEBPACK_IMPORTED_MODULE_2__.PanelBody, {
         title: (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_0__.__)('Prefix & Suffix', 'gatherpress-statistics'),
         initialOpen: false,
-        children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_8__.jsx)(_wordpress_components__WEBPACK_IMPORTED_MODULE_2__.TextControl, {
+        children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)(_wordpress_components__WEBPACK_IMPORTED_MODULE_2__.TextControl, {
           label: (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_0__.__)('Default Prefix', 'gatherpress-statistics'),
           value: prefixDefault,
           onChange: value => setAttributes({
             prefixDefault: value
           }),
           placeholder: (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_0__.__)('e.g., +', 'gatherpress-statistics')
-        }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_8__.jsx)(_wordpress_components__WEBPACK_IMPORTED_MODULE_2__.TextControl, {
+        }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)(_wordpress_components__WEBPACK_IMPORTED_MODULE_2__.TextControl, {
           label: (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_0__.__)('Default Suffix', 'gatherpress-statistics'),
           value: suffixDefault,
           onChange: value => setAttributes({
             suffixDefault: value
           }),
           placeholder: (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_0__.__)('e.g., total', 'gatherpress-statistics')
-        }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_8__.jsx)("hr", {}), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_8__.jsx)(_wordpress_components__WEBPACK_IMPORTED_MODULE_2__.__experimentalNumberControl, {
+        }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)("hr", {}), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)(_wordpress_components__WEBPACK_IMPORTED_MODULE_2__.__experimentalNumberControl, {
           label: (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_0__.__)('Conditional Threshold', 'gatherpress-statistics'),
           value: conditionalThreshold,
           onChange: value => setAttributes({
@@ -437,7 +442,7 @@ function Edit({
           }),
           min: 1,
           help: (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_0__.__)('Use alternate prefix/suffix when count exceeds this value', 'gatherpress-statistics')
-        }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_8__.jsx)(_wordpress_components__WEBPACK_IMPORTED_MODULE_2__.TextControl, {
+        }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)(_wordpress_components__WEBPACK_IMPORTED_MODULE_2__.TextControl, {
           label: (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_0__.__)('Conditional Prefix', 'gatherpress-statistics'),
           value: prefixConditional,
           onChange: value => setAttributes({
@@ -445,7 +450,7 @@ function Edit({
           }),
           placeholder: (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_0__.__)('e.g., Over', 'gatherpress-statistics'),
           help: (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_0__.__)('Used when count > threshold', 'gatherpress-statistics')
-        }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_8__.jsx)(_wordpress_components__WEBPACK_IMPORTED_MODULE_2__.TextControl, {
+        }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)(_wordpress_components__WEBPACK_IMPORTED_MODULE_2__.TextControl, {
           label: (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_0__.__)('Conditional Suffix', 'gatherpress-statistics'),
           value: suffixConditional,
           onChange: value => setAttributes({
@@ -454,13 +459,13 @@ function Edit({
           placeholder: (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_0__.__)('e.g., and counting!', 'gatherpress-statistics'),
           help: (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_0__.__)('Used when count > threshold', 'gatherpress-statistics')
         })]
-      }), showSingleTaxonomyFilter && isCurrentTypeSupported && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_8__.jsx)(_wordpress_components__WEBPACK_IMPORTED_MODULE_2__.PanelBody, {
+      }), showSingleTaxonomyFilter && isCurrentTypeSupported && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)(_wordpress_components__WEBPACK_IMPORTED_MODULE_2__.PanelBody, {
         title: (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_0__.__)('Taxonomy Filter', 'gatherpress-statistics'),
         initialOpen: false,
-        children: isLoadingTaxonomies ? /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_8__.jsx)("p", {
+        children: isLoadingTaxonomies ? /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)("p", {
           children: (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_0__.__)('Loading taxonomies…', 'gatherpress-statistics')
-        }) : filteredTaxonomies && filteredTaxonomies.length > 0 ? /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_8__.jsxs)(react_jsx_runtime__WEBPACK_IMPORTED_MODULE_8__.Fragment, {
-          children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_8__.jsx)(_wordpress_components__WEBPACK_IMPORTED_MODULE_2__.SelectControl, {
+        }) : filteredTaxonomies && filteredTaxonomies.length > 0 ? /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsxs)(react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.Fragment, {
+          children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)(_wordpress_components__WEBPACK_IMPORTED_MODULE_2__.SelectControl, {
             label: (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_0__.__)('Select Taxonomy', 'gatherpress-statistics'),
             value: selectedTaxonomy,
             options: [{
@@ -473,7 +478,7 @@ function Edit({
                 selectedTerm: 0
               });
             }
-          }), selectedTaxonomy && allTaxonomyTerms[selectedTaxonomy] && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_8__.jsx)(_wordpress_components__WEBPACK_IMPORTED_MODULE_2__.FormTokenField, {
+          }), selectedTaxonomy && allTaxonomyTerms[selectedTaxonomy] && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)(_wordpress_components__WEBPACK_IMPORTED_MODULE_2__.FormTokenField, {
             label: (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_0__.__)('Select Term', 'gatherpress-statistics'),
             value: selectedTerm ? [allTaxonomyTerms[selectedTaxonomy].find(t => t.id === selectedTerm)?.name].filter(Boolean) : [],
             suggestions: allTaxonomyTerms[selectedTaxonomy].map(term => term.name),
@@ -494,15 +499,15 @@ function Edit({
             maxLength: 1,
             help: (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_0__.__)('Select one term to filter by', 'gatherpress-statistics')
           })]
-        }) : /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_8__.jsx)("p", {
+        }) : /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)("p", {
           children: (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_0__.__)('No taxonomies available', 'gatherpress-statistics')
         })
-      }), showTotalTaxonomyTerms && isCurrentTypeSupported && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_8__.jsx)(_wordpress_components__WEBPACK_IMPORTED_MODULE_2__.PanelBody, {
+      }), showTotalTaxonomyTerms && isCurrentTypeSupported && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)(_wordpress_components__WEBPACK_IMPORTED_MODULE_2__.PanelBody, {
         title: (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_0__.__)('Taxonomy Selection', 'gatherpress-statistics'),
         initialOpen: false,
-        children: isLoadingTaxonomies ? /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_8__.jsx)("p", {
+        children: isLoadingTaxonomies ? /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)("p", {
           children: (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_0__.__)('Loading taxonomies…', 'gatherpress-statistics')
-        }) : filteredTaxonomies && filteredTaxonomies.length > 0 ? /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_8__.jsx)(_wordpress_components__WEBPACK_IMPORTED_MODULE_2__.SelectControl, {
+        }) : filteredTaxonomies && filteredTaxonomies.length > 0 ? /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)(_wordpress_components__WEBPACK_IMPORTED_MODULE_2__.SelectControl, {
           label: (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_0__.__)('Select Taxonomy', 'gatherpress-statistics'),
           value: selectedTaxonomy,
           options: [{
@@ -512,16 +517,16 @@ function Edit({
           onChange: value => setAttributes({
             selectedTaxonomy: value
           })
-        }) : /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_8__.jsx)("p", {
+        }) : /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)("p", {
           children: (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_0__.__)('No taxonomies available', 'gatherpress-statistics')
         })
-      }), showTaxonomyTermsByTaxonomy && isCurrentTypeSupported && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_8__.jsx)(_wordpress_components__WEBPACK_IMPORTED_MODULE_2__.PanelBody, {
+      }), showTaxonomyTermsByTaxonomy && isCurrentTypeSupported && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)(_wordpress_components__WEBPACK_IMPORTED_MODULE_2__.PanelBody, {
         title: (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_0__.__)('Taxonomy Configuration', 'gatherpress-statistics'),
         initialOpen: false,
-        children: isLoadingTaxonomies ? /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_8__.jsx)("p", {
+        children: isLoadingTaxonomies ? /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)("p", {
           children: (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_0__.__)('Loading taxonomies…', 'gatherpress-statistics')
-        }) : filteredTaxonomies && filteredTaxonomies.length > 0 ? /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_8__.jsxs)(react_jsx_runtime__WEBPACK_IMPORTED_MODULE_8__.Fragment, {
-          children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_8__.jsx)(_wordpress_components__WEBPACK_IMPORTED_MODULE_2__.SelectControl, {
+        }) : filteredTaxonomies && filteredTaxonomies.length > 0 ? /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsxs)(react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.Fragment, {
+          children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)(_wordpress_components__WEBPACK_IMPORTED_MODULE_2__.SelectControl, {
             label: (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_0__.__)('Count Terms From', 'gatherpress-statistics'),
             value: countTaxonomy,
             options: [{
@@ -532,7 +537,7 @@ function Edit({
               countTaxonomy: value
             }),
             help: (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_0__.__)('Which taxonomy terms should be counted?', 'gatherpress-statistics')
-          }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_8__.jsx)(_wordpress_components__WEBPACK_IMPORTED_MODULE_2__.SelectControl, {
+          }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)(_wordpress_components__WEBPACK_IMPORTED_MODULE_2__.SelectControl, {
             label: (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_0__.__)('Filter By Taxonomy', 'gatherpress-statistics'),
             value: filterTaxonomy,
             options: [{
@@ -546,7 +551,7 @@ function Edit({
               });
             },
             help: (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_0__.__)('Which taxonomy should be used to filter?', 'gatherpress-statistics')
-          }), filterTaxonomy && allTaxonomyTerms[filterTaxonomy] && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_8__.jsx)(_wordpress_components__WEBPACK_IMPORTED_MODULE_2__.SelectControl, {
+          }), filterTaxonomy && allTaxonomyTerms[filterTaxonomy] && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)(_wordpress_components__WEBPACK_IMPORTED_MODULE_2__.SelectControl, {
             label: (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_0__.__)('Select Term', 'gatherpress-statistics'),
             value: selectedTerm,
             options: [{
@@ -560,10 +565,10 @@ function Edit({
               selectedTerm: parseInt(value, 10)
             })
           })]
-        }) : /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_8__.jsx)("p", {
+        }) : /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)("p", {
           children: (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_0__.__)('No taxonomies available', 'gatherpress-statistics')
         })
-      }), showMultiTaxonomy && isCurrentTypeSupported && filteredTaxonomies && filteredTaxonomies.length > 0 && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_8__.jsx)(react_jsx_runtime__WEBPACK_IMPORTED_MODULE_8__.Fragment, {
+      }), showMultiTaxonomy && isCurrentTypeSupported && filteredTaxonomies && filteredTaxonomies.length > 0 && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)(react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.Fragment, {
         children: filteredTaxonomies.map(taxonomy => {
           const taxonomyTerms = allTaxonomyTerms[taxonomy.slug] || [];
           const suggestions = taxonomyTerms.reduce((acc, term) => {
@@ -572,10 +577,10 @@ function Edit({
           }, {});
           const selectedTermIds = selectedTaxonomyTerms[taxonomy.slug] || [];
           const selectedNames = taxonomyTerms.filter(term => selectedTermIds.includes(term.id)).map(term => term.name);
-          return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_8__.jsx)(_wordpress_components__WEBPACK_IMPORTED_MODULE_2__.PanelBody, {
+          return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)(_wordpress_components__WEBPACK_IMPORTED_MODULE_2__.PanelBody, {
             title: taxonomy.name,
             initialOpen: false,
-            children: taxonomyTerms.length > 0 ? /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_8__.jsx)(_wordpress_components__WEBPACK_IMPORTED_MODULE_2__.FormTokenField, {
+            children: taxonomyTerms.length > 0 ? /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)(_wordpress_components__WEBPACK_IMPORTED_MODULE_2__.FormTokenField, {
               label: (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_0__.__)('Select Terms', 'gatherpress-statistics'),
               value: selectedNames,
               suggestions: Object.keys(suggestions),
@@ -589,41 +594,41 @@ function Edit({
                   selectedTaxonomyTerms: newSelectedTaxonomyTerms
                 });
               }
-            }) : /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_8__.jsx)("p", {
+            }) : /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)("p", {
               children: (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_0__.__)('No terms found', 'gatherpress-statistics')
             })
           }, taxonomy.slug);
         })
       })]
-    }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_8__.jsx)("div", {
+    }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)("div", {
       ...(0,_wordpress_block_editor__WEBPACK_IMPORTED_MODULE_1__.useBlockProps)(),
-      children: !isLoadingTypes && !isCurrentTypeSupported ? /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_8__.jsxs)("div", {
+      children: !isLoadingTypes && !isCurrentTypeSupported ? /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsxs)("div", {
         className: "gatherpress-stats-preview",
         style: {
           opacity: 0.5
         },
-        children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_8__.jsx)("div", {
+        children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)("div", {
           className: "gatherpress-stats-value",
           children: "\u26A0\uFE0F"
-        }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_8__.jsx)("div", {
+        }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)("div", {
           className: "gatherpress-stats-label",
           children: (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_0__.__)('Statistic type disabled', 'gatherpress-statistics')
         })]
-      }) : /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_8__.jsxs)("div", {
+      }) : /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsxs)("div", {
         className: "gatherpress-stats-preview",
-        children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_8__.jsxs)("div", {
+        children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsxs)("div", {
           className: "gatherpress-stats-value",
-          children: [displayPrefix && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_8__.jsx)("span", {
+          children: [displayPrefix && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)("span", {
             className: "gatherpress-stats-prefix",
             children: displayPrefix
-          }), displayPrefix && ' ', /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_8__.jsx)("span", {
+          }), displayPrefix && ' ', /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)("span", {
             className: "gatherpress-stats-number",
             children: previewCount
-          }), displaySuffix && ' ', displaySuffix && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_8__.jsx)("span", {
+          }), displaySuffix && ' ', displaySuffix && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)("span", {
             className: "gatherpress-stats-suffix",
             children: displaySuffix
           })]
-        }), showLabel && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_8__.jsx)("div", {
+        }), showLabel && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_7__.jsx)("div", {
           className: "gatherpress-stats-label",
           children: displayLabel
         })]
