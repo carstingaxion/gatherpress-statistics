@@ -72,6 +72,6 @@ class Setup {
 	 * @return void
 	 */
 	public function block_init(): void {
-		register_block_type( GATHERPRESS_STATISTICS_CORE_PATH . '/build/' );
+		register_block_type( GATHERPRESS_STATISTICS_CORE_PATH . '/build/editor/blocks/statistics/' );
 	}
 }

@@ -63,6 +63,42 @@ class Admin_Page {
 			'4.4.1',
 			true
 		);
+
+		$asset_file = GATHERPRESS_STATISTICS_CORE_PATH . '/build/admin/page/index.asset.php';
+
+		if ( ! file_exists( $asset_file ) ) {
+			return;
+		}
+
+		/**
+		 * The asset file is expected to return an array with 'dependencies' and 'version' keys.
+		 *
+		 * @var array{dependencies: string[], version: string} $asset
+		 */
+		$asset = include $asset_file; // phpcs:ignore WordPressVIPMinimum.Files.IncludingFile.UsingVariable
+
+		if ( ! is_array( $asset ) || ! isset( $asset['dependencies'], $asset['version'] ) ) {
+			return;
+		}
+
+		wp_enqueue_script(
+			'gatherpress-statistics-admin-page',
+			plugins_url( 'build/admin/page/index.js', GATHERPRESS_STATISTICS_CORE_PATH . '/plugin.php' ),
+			array_merge( $asset['dependencies'], array( 'chartjs' ) ),
+			(string) $asset['version'],
+			true
+		);
+
+		$style_path = GATHERPRESS_STATISTICS_CORE_PATH . '/build/admin/page/style-index.css';
+
+		if ( file_exists( $style_path ) ) {
+			wp_enqueue_style(
+				'gatherpress-statistics-admin-page',
+				plugins_url( 'build/admin/page/style-index.css', GATHERPRESS_STATISTICS_CORE_PATH . '/plugin.php' ),
+				array(),
+				(string) $asset['version']
+			);
+		}
 	}
 
 	/**
@@ -429,130 +465,13 @@ class Admin_Page {
 					</div>
 					<canvas id="gatherpress-stats-chart" width="400" height="150"></canvas>
 				</div>
-				<style>
-					.gatherpress-stats-chart-container {
-						margin: 20px 0;
-						padding: 20px;
-						background: #fff;
-						border: 1px solid #ccd0d4;
-						box-shadow: 0 1px 1px rgba(0,0,0,.04);
-					}
-					.gatherpress-stats-chart-controls {
-						margin-bottom: 20px;
-					}
-					.gatherpress-stats-chart-controls h3 {
-						margin: 0 0 10px 0;
-						font-size: 14px;
-						font-weight: 600;
-					}
-					#gatherpress-term-toggles {
-						display: flex;
-						flex-wrap: wrap;
-						gap: 10px;
-					}
-					.term-toggle {
-						display: inline-flex;
-						align-items: center;
-						gap: 5px;
-						padding: 5px 10px;
-						border: 1px solid #ddd;
-						border-radius: 3px;
-						cursor: pointer;
-						background: #f7f7f7;
-						transition: all 0.2s;
-					}
-					.term-toggle:hover {
-						background: #e9e9e9;
-					}
-					.term-toggle.active {
-						background: #fff;
-						border-color: #0073aa;
-					}
-					.term-color-box {
-						width: 16px;
-						height: 16px;
-						border-radius: 2px;
-					}
-					.sortable-column a {
-						text-decoration: none;
-					}
-					.sortable-column .dashicons {
-						width: 14px;
-						height: 14px;
-						font-size: 14px;
-					}
-				</style>
-				<script type="text/javascript">
-					var gatherpressChartData = <?php echo wp_json_encode( $chart_data ); ?>;
-					
-					jQuery(document).ready(function($) {
-						if (typeof Chart === 'undefined' || !gatherpressChartData) {
-							return;
-						}
-
-						var ctx = document.getElementById('gatherpress-stats-chart');
-						if (!ctx) return;
-
-						var chartConfig = {
-							type: 'line',
-							data: {
-								labels: gatherpressChartData.labels,
-								datasets: gatherpressChartData.datasets
-							},
-							options: {
-								responsive: true,
-								maintainAspectRatio: true,
-								plugins: {
-									legend: {
-										display: false
-									},
-									tooltip: {
-										mode: 'index',
-										intersect: false
-									}
-								},
-								scales: {
-									y: {
-										beginAtZero: true,
-										ticks: {
-											precision: 0,
-											stepSize: 1
-										}
-									}
-								}
-							}
-						};
-
-						var chart = new Chart(ctx, chartConfig);
-
-						var togglesContainer = document.getElementById('gatherpress-term-toggles');
-						if (!togglesContainer) return;
-
-						gatherpressChartData.datasets.forEach(function(dataset, index) {
-							var toggle = document.createElement('div');
-							toggle.className = 'term-toggle active';
-							toggle.setAttribute('data-index', index);
-
-							var colorBox = document.createElement('div');
-							colorBox.className = 'term-color-box';
-							colorBox.style.backgroundColor = dataset.borderColor;
-
-							var label = document.createElement('span');
-							label.textContent = dataset.label;
-
-							toggle.appendChild(colorBox);
-							toggle.appendChild(label);
-							togglesContainer.appendChild(toggle);
-
-							toggle.addEventListener('click', function() {
-								var meta = chart.getDatasetMeta(index);
-								meta.hidden = !meta.hidden;
-								toggle.classList.toggle('active');
-								chart.update();
-							});
-						});
-					});
-				</script>
+				<?php
+				wp_add_inline_script(
+					'gatherpress-statistics-admin-page',
+					'window.gatherpressChartData = ' . wp_json_encode( $chart_data ) . ';',
+					'before'
+				);
+				?>
 			<?php } ?>
 			
 			<div class="tablenav top">
