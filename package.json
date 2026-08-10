@@ -21,7 +21,8 @@
 	"main": "build/index.js",
 	"devDependencies": {
 		"@wordpress/i18n": "^5.4.0",
-		"@wordpress/scripts": "^30.15.0"
+		"@wordpress/scripts": "^30.15.0",
+		"chart.js": "^4.4.1"
 	},
 	"scripts": {
 		"build": "wp-scripts build --webpack-copy-php",
@@ -44,8 +45,5 @@
 		"packages-update": "wp-scripts packages-update",
 		"plugin-zip": "wp-scripts plugin-zip",
 		"start": "wp-scripts start --blocks-manifest"
-	},
-	"dependencies": {
-		"chart.js": "^4.4.1"
 	}
 }
