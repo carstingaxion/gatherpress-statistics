@@ -56,14 +56,6 @@ class Admin_Page {
 			return;
 		}
 
-		wp_enqueue_script(
-			'chartjs',
-			'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js',
-			array(),
-			'4.4.1',
-			true
-		);
-
 		$asset_file = GATHERPRESS_STATISTICS_CORE_PATH . '/build/admin/page/index.asset.php';
 
 		if ( ! file_exists( $asset_file ) ) {
@@ -72,6 +64,10 @@ class Admin_Page {
 
 		/**
 		 * The asset file is expected to return an array with 'dependencies' and 'version' keys.
+		 *
+		 * Chart.js is bundled into this script via the build pipeline (see
+		 * src/admin/page/index.js) rather than loaded from a CDN, so no
+		 * separate 'chartjs' script registration or dependency is needed here.
 		 *
 		 * @var array{dependencies: string[], version: string} $asset
 		 */
@@ -84,7 +80,7 @@ class Admin_Page {
 		wp_enqueue_script(
 			'gatherpress-statistics-admin-page',
 			plugins_url( 'build/admin/page/index.js', GATHERPRESS_STATISTICS_CORE_PATH . '/plugin.php' ),
-			array_merge( $asset['dependencies'], array( 'chartjs' ) ),
+			$asset['dependencies'],
 			(string) $asset['version'],
 			true
 		);

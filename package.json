@@ -5,9 +5,9 @@
 	"author": "Carsten Bach & WordPress Telex",
 	"license": "GPL-2.0-or-later",
 	"keywords": [
-		"statistics", 
-		"counters", 
-		"gatherpress", 
+		"statistics",
+		"counters",
+		"gatherpress",
 		"events"
 	],
 	"homepage": "https://github.com/carstingaxion/gatherpress-statistics#readme",
@@ -44,5 +44,8 @@
 		"packages-update": "wp-scripts packages-update",
 		"plugin-zip": "wp-scripts plugin-zip",
 		"start": "wp-scripts start --blocks-manifest"
+	},
+	"dependencies": {
+		"chart.js": "^4.4.1"
 	}
 }

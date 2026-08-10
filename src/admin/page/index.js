@@ -7,6 +7,18 @@
  */
 
 /**
+ * External dependencies
+ *
+ * Chart.js is bundled via the build pipeline (rather than loaded from a
+ * CDN) so the plugin has no runtime dependency on a third-party host —
+ * required for WordPress.org distribution and to avoid privacy/offline/CSP
+ * concerns. The `chart.js/auto` entry auto-registers all controllers,
+ * elements, scales and plugins, matching the UMD bundle previously loaded
+ * from jsdelivr.
+ */
+import Chart from 'chart.js/auto';
+
+/**
  * Lets webpack process CSS, SASS or SCSS files referenced in JavaScript files.
  *
  * @see https://www.npmjs.com/package/@wordpress/scripts#using-css
@@ -14,7 +26,7 @@
 import './style.scss';
 
 jQuery( document ).ready( function ( $ ) {
-	if ( typeof Chart === 'undefined' || ! window.gatherpressChartData ) {
+	if ( ! window.gatherpressChartData ) {
 		return;
 	}
 
