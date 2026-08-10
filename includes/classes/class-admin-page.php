@@ -7,6 +7,8 @@
 
 namespace GatherPressStatistics;
 
+use GatherPress\Core;
+
 // Exit if accessed directly.
 defined( 'ABSPATH' ) || exit; // @codeCoverageIgnore
 
@@ -16,35 +18,30 @@ defined( 'ABSPATH' ) || exit; // @codeCoverageIgnore
  * @since 0.1.0
  */
 class Admin_Page {
-	/**
-	 * Class instance.
-	 *
-	 * @since 0.1.0
-	 * @var Admin_Page|null
-	 */
-	private static $instance = null;
 
-	/**
-	 * Get class instance.
-	 *
-	 * @since 0.1.0
-	 *
-	 * @return Admin_Page
-	 */
-	public static function get_instance(): Admin_Page {
-		if ( null === self::$instance ) {
-			self::$instance = new self();
-		}
-
-		return self::$instance;
-	}
+	use Core\Traits\Singleton;
 
 	/**
 	 * Constructor.
 	 *
 	 * @since 0.1.0
 	 */
-	private function __construct() {}
+	protected function __construct() {
+		$this->setup_hooks();
+	}
+
+	/**
+	 * Set up hooks for various purposes.
+	 *
+	 * @since 0.1.0
+	 *
+	 * @return void
+	 */
+	protected function setup_hooks(): void {
+		add_action( 'admin_menu', array( $this, 'register_admin_page' ) );
+		add_action( 'admin_init', array( $this, 'handle_manual_archive_generation' ) );
+		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_assets' ) );
+	}
 
 	/**
 	 * Enqueue admin assets.

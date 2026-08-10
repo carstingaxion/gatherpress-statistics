@@ -7,6 +7,8 @@
 
 namespace GatherPressStatistics;
 
+use GatherPress\Core;
+
 // Exit if accessed directly.
 defined( 'ABSPATH' ) || exit; // @codeCoverageIgnore
 
@@ -16,35 +18,35 @@ defined( 'ABSPATH' ) || exit; // @codeCoverageIgnore
  * @since 0.1.0
  */
 class Cache_Invalidation {
-	/**
-	 * Class instance.
-	 *
-	 * @since 0.1.0
-	 * @var Cache_Invalidation|null
-	 */
-	private static $instance = null;
 
-	/**
-	 * Get class instance.
-	 *
-	 * @since 0.1.0
-	 *
-	 * @return Cache_Invalidation
-	 */
-	public static function get_instance(): Cache_Invalidation {
-		if ( null === self::$instance ) {
-			self::$instance = new self();
-		}
-
-		return self::$instance;
-	}
+	use Core\Traits\Singleton;
 
 	/**
 	 * Constructor.
 	 *
 	 * @since 0.1.0
 	 */
-	private function __construct() {}
+	protected function __construct() {
+		$this->setup_hooks();
+	}
+
+	/**
+	 * Set up hooks for various purposes.
+	 *
+	 * @since 0.1.0
+	 *
+	 * @return void
+	 */
+	protected function setup_hooks(): void {
+		add_action( 'transition_post_status', array( $this, 'clear_cache_on_status_change' ), 10, 3 );
+		add_action( 'updated_post_meta', array( $this, 'clear_cache_on_meta_update' ), 10, 3 );
+		add_action( 'added_post_meta', array( $this, 'clear_cache_on_meta_update' ), 10, 3 );
+		add_action( 'deleted_post_meta', array( $this, 'clear_cache_on_meta_delete' ), 10, 3 );
+		add_action( 'create_term', array( $this, 'clear_cache_on_term_change' ), 10, 3 );
+		add_action( 'edit_term', array( $this, 'clear_cache_on_term_change' ), 10, 3 );
+		add_action( 'delete_term', array( $this, 'clear_cache_on_term_change' ), 10, 3 );
+		add_action( 'set_object_terms', array( $this, 'clear_cache_on_term_relationship' ), 10, 3 );
+	}
 
 	/**
 	 * Clear cache when event post status changes.

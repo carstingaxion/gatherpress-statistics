@@ -7,6 +7,8 @@
 
 namespace GatherPressStatistics;
 
+use GatherPress\Core;
+
 // Exit if accessed directly.
 defined( 'ABSPATH' ) || exit; // @codeCoverageIgnore
 
@@ -16,35 +18,29 @@ defined( 'ABSPATH' ) || exit; // @codeCoverageIgnore
  * @since 0.1.0
  */
 class Setup {
-	/**
-	 * Class instance.
-	 *
-	 * @since 0.1.0
-	 * @var Setup|null
-	 */
-	private static $instance = null;
 
-	/**
-	 * Get class instance.
-	 *
-	 * @since 0.1.0
-	 *
-	 * @return Setup
-	 */
-	public static function get_instance(): Setup {
-		if ( null === self::$instance ) {
-			self::$instance = new self();
-		}
-
-		return self::$instance;
-	}
+	use Core\Traits\Singleton;
 
 	/**
 	 * Constructor.
 	 *
 	 * @since 0.1.0
 	 */
-	private function __construct() {}
+	protected function __construct() {
+		$this->setup_hooks();
+	}
+
+	/**
+	 * Set up hooks for various purposes.
+	 *
+	 * @since 0.1.0
+	 *
+	 * @return void
+	 */
+	protected function setup_hooks(): void {
+		add_action( 'registered_post_type_gatherpress_event', array( $this, 'register_post_type_support' ) );
+		add_action( 'init', array( $this, 'block_init' ) );
+	}
 
 	/**
 	 * Register post type support for gatherpress_statistics.

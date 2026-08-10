@@ -7,6 +7,8 @@
 
 namespace GatherPressStatistics;
 
+use GatherPress\Core;
+
 // Exit if accessed directly.
 defined( 'ABSPATH' ) || exit; // @codeCoverageIgnore
 
@@ -16,35 +18,28 @@ defined( 'ABSPATH' ) || exit; // @codeCoverageIgnore
  * @since 0.1.0
  */
 class Archive {
-	/**
-	 * Class instance.
-	 *
-	 * @since 0.1.0
-	 * @var Archive|null
-	 */
-	private static $instance = null;
 
-	/**
-	 * Get class instance.
-	 *
-	 * @since 0.1.0
-	 *
-	 * @return Archive
-	 */
-	public static function get_instance(): Archive {
-		if ( null === self::$instance ) {
-			self::$instance = new self();
-		}
-
-		return self::$instance;
-	}
+	use Core\Traits\Singleton;
 
 	/**
 	 * Constructor.
 	 *
 	 * @since 0.1.0
 	 */
-	private function __construct() {}
+	protected function __construct() {
+		$this->setup_hooks();
+	}
+
+	/**
+	 * Set up hooks for various purposes.
+	 *
+	 * @since 0.1.0
+	 *
+	 * @return void
+	 */
+	protected function setup_hooks(): void {
+		add_action( 'gatherpress_statistics_monthly_archive', array( $this, 'archive_monthly_statistics' ) );
+	}
 
 	/**
 	 * Archive monthly statistics.

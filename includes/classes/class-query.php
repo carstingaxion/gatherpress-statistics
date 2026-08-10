@@ -7,6 +7,8 @@
 
 namespace GatherPressStatistics;
 
+use GatherPress\Core;
+
 // Exit if accessed directly.
 defined( 'ABSPATH' ) || exit; // @codeCoverageIgnore
 
@@ -16,28 +18,8 @@ defined( 'ABSPATH' ) || exit; // @codeCoverageIgnore
  * @since 0.1.0
  */
 class Query {
-	/**
-	 * Class instance.
-	 *
-	 * @since 0.1.0
-	 * @var Query|null
-	 */
-	private static $instance = null;
 
-	/**
-	 * Get class instance.
-	 *
-	 * @since 0.1.0
-	 *
-	 * @return Query
-	 */
-	public static function get_instance(): Query {
-		if ( null === self::$instance ) {
-			self::$instance = new self();
-		}
-
-		return self::$instance;
-	}
+	use Core\Traits\Singleton;
 
 	/**
 	 * Constructor.
