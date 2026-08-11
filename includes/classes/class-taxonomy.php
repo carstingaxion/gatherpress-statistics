@@ -80,7 +80,8 @@ class Taxonomy {
 		
 		$excluded_taxonomies = apply_filters(
 			'gatherpress_statistics_excluded_taxonomies',
-			array( '_gatherpress_venue' ),
+			// array( '_gatherpress_venue' ),
+			array(),
 			$for_editor
 		);
 		

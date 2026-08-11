@@ -168,21 +168,109 @@ class Admin_Page {
 	}
 
 	/**
+	 * Statistic types whose archived rows mix terms from multiple taxonomies
+	 * and therefore need one tab per taxonomy instead of a single shared tab.
+	 *
+	 * @since 0.1.0
+	 *
+	 * @return array<int, string> Statistic type slugs.
+	 */
+	private function get_taxonomy_splittable_types(): array {
+		return array( 'events_per_taxonomy', 'total_attendees' );
+	}
+
+	/**
+	 * Build the list of dashboard tabs.
+	 *
+	 * Statistic types that mix terms from multiple taxonomies (see
+	 * get_taxonomy_splittable_types()) are expanded into one tab per
+	 * registered taxonomy. 'total_attendees' additionally keeps its
+	 * taxonomy-less aggregate as its own tab, since that configuration is
+	 * archived separately (see Cache::get_common_configs()).
+	 *
+	 * @since 0.1.0
+	 *
+	 * @return array<int, array{key: string, statistic_type: string, taxonomy: ?string, label: string}> Tabs.
+	 */
+	private function get_tabs(): array {
+		$supported_types  = Support::get_instance()->get_supported_statistic_types();
+		$splittable_types = $this->get_taxonomy_splittable_types();
+		$taxonomies       = Taxonomy::get_instance()->get_filtered_taxonomies();
+
+		$tabs = array();
+
+		foreach ( $supported_types as $type ) {
+			if ( ! in_array( $type, $splittable_types, true ) ) {
+				$tabs[] = array(
+					'key'            => $type,
+					'statistic_type' => $type,
+					'taxonomy'       => null,
+					'label'          => $this->get_statistic_type_label( $type ),
+				);
+				continue;
+			}
+
+			if ( 'total_attendees' === $type ) {
+				$tabs[] = array(
+					'key'            => $type,
+					'statistic_type' => $type,
+					'taxonomy'       => null,
+					'label'          => $this->get_statistic_type_label( $type ),
+				);
+			}
+
+			foreach ( $taxonomies as $taxonomy ) {
+				if ( ! isset( $taxonomy->name ) ) {
+					continue;
+				}
+
+				$tabs[] = array(
+					'key'            => $type . '::' . $taxonomy->name,
+					'statistic_type' => $type,
+					'taxonomy'       => $taxonomy->name,
+					'label'          => $this->get_statistic_type_label( $type, $taxonomy ),
+				);
+			}
+		}
+
+		return $tabs;
+	}
+
+	/**
 	 * Get human-readable label for statistic type.
 	 *
 	 * @since 0.1.0
 	 *
-	 * @param string $type Statistic type slug.
+	 * @param string       $type     Statistic type slug.
+	 * @param ?\WP_Taxonomy $taxonomy Optional. Taxonomy this tab is scoped to.
 	 * @return string Human-readable label.
 	 */
-	private function get_statistic_type_label( string $type ): string {
+	private function get_statistic_type_label( string $type, ?\WP_Taxonomy $taxonomy = null ): string {
 		$post_types   = Support::get_instance()->get_supported_post_types();
 		$post_type    = ! empty( $post_types ) ? $post_types[0] : 'gatherpress_event';
 		$plural_label = Support::get_instance()->get_post_type_plural_label( $post_type );
 
+		if ( null !== $taxonomy ) {
+			$taxonomy_label = isset( $taxonomy->labels->singular_name ) ? $taxonomy->labels->singular_name : $taxonomy->label;
+
+			if ( 'total_attendees' === $type ) {
+				return sprintf(
+					/* translators: %s: taxonomy singular label, e.g. "Topic". */
+					__( 'Total Attendees per %s', 'gatherpress-statistics' ),
+					$taxonomy_label
+				);
+			}
+
+			return sprintf(
+				/* translators: 1: plural post type label, e.g. "Events". 2: taxonomy singular label, e.g. "Topic". */
+				__( '%1$s per %2$s', 'gatherpress-statistics' ),
+				$plural_label,
+				$taxonomy_label
+			);
+		}
+
 		$labels = array(
 			'total_events'               => sprintf( __( 'Total %s', 'gatherpress-statistics' ), $plural_label ),
-			'events_per_taxonomy'        => sprintf( __( '%s per Taxonomy', 'gatherpress-statistics' ), $plural_label ),
 			'events_multi_taxonomy'      => sprintf( __( '%s (Multiple Taxonomies)', 'gatherpress-statistics' ), $plural_label ),
 			'total_taxonomy_terms'       => __( 'Total Taxonomy Terms', 'gatherpress-statistics' ),
 			'taxonomy_terms_by_taxonomy' => __( 'Taxonomy Terms by Taxonomy', 'gatherpress-statistics' ),
@@ -303,15 +391,25 @@ class Admin_Page {
 		$selected_month    = isset( $_GET['month'] ) ? absint( $_GET['month'] ) : null;
 		$selected_taxonomy = isset( $_GET['taxonomy'] ) ? sanitize_text_field( $_GET['taxonomy'] ) : null;
 		$selected_term     = isset( $_GET['term_id'] ) ? absint( $_GET['term_id'] ) : null;
-		$current_tab       = isset( $_GET['tab'] ) ? sanitize_text_field( $_GET['tab'] ) : '';
+		$current_tab_key   = isset( $_GET['tab'] ) ? sanitize_text_field( $_GET['tab'] ) : '';
 		$order_by          = isset( $_GET['orderby'] ) ? sanitize_text_field( $_GET['orderby'] ) : 'statistic_year';
 		$order             = isset( $_GET['order'] ) && $_GET['order'] === 'asc' ? 'ASC' : 'DESC';
 		
-		$supported_types = Support::get_instance()->get_supported_statistic_types();
+		$tabs = $this->get_tabs();
 		
-		if ( empty( $current_tab ) && ! empty( $supported_types ) ) {
-			$current_tab = $supported_types[0];
+		$current_tab = null;
+		foreach ( $tabs as $tab ) {
+			if ( $tab['key'] === $current_tab_key ) {
+				$current_tab = $tab;
+				break;
+			}
 		}
+		
+		if ( null === $current_tab && ! empty( $tabs ) ) {
+			$current_tab = $tabs[0];
+		}
+		
+		$current_tab_key = null !== $current_tab ? $current_tab['key'] : '';
 		
 		$years = $wpdb->get_col( "SELECT DISTINCT statistic_year FROM {$table_name} ORDER BY statistic_year DESC" );
 		
@@ -328,9 +426,17 @@ class Admin_Page {
 		$where_clauses = array();
 		$query_params  = array();
 		
-		if ( ! empty( $current_tab ) ) {
+		if ( null !== $current_tab ) {
 			$where_clauses[] = 'statistic_type = %s';
-			$query_params[]  = $current_tab;
+			$query_params[]  = $current_tab['statistic_type'];
+			
+			if ( null !== $current_tab['taxonomy'] ) {
+				$where_clauses[] = "filters_data LIKE '%\"taxonomy\":\"" . $wpdb->esc_like( $current_tab['taxonomy'] ) . "\"%'";
+			} elseif ( in_array( $current_tab['statistic_type'], $this->get_taxonomy_splittable_types(), true ) ) {
+				// The taxonomy-less aggregate tab (e.g. plain "Total Attendees") must
+				// exclude rows that belong to one of the per-taxonomy tabs.
+				$where_clauses[] = "filters_data NOT LIKE '%\"taxonomy\":%'";
+			}
 		}
 		
 		if ( $selected_year ) {
@@ -379,7 +485,7 @@ class Admin_Page {
 		$base_url = add_query_arg(
 			array(
 				'page'     => 'gatherpress-statistics-archive',
-				'tab'      => $current_tab,
+				'tab'      => $current_tab_key,
 				'year'     => $selected_year,
 				'month'    => $selected_month,
 				'taxonomy' => $selected_taxonomy,
@@ -390,7 +496,7 @@ class Admin_Page {
 		
 		$next_order = ( $order === 'ASC' ) ? 'desc' : 'asc';
 		
-		$chart_data = $this->prepare_chart_data( $statistics, $current_tab );
+		$chart_data = $this->prepare_chart_data( $statistics, $current_tab_key );
 		
 		?>
 		<div class="wrap">
@@ -445,10 +551,10 @@ class Admin_Page {
 			<h2><?php esc_html_e( 'Archived Statistics', 'gatherpress-statistics' ); ?></h2>
 			
 			<h2 class="nav-tab-wrapper">
-				<?php foreach ( $supported_types as $type ) { ?>
-					<a href="<?php echo esc_url( add_query_arg( 'tab', $type, remove_query_arg( array( 'orderby', 'order' ), $base_url ) ) ); ?>" 
-						class="nav-tab <?php echo $type === $current_tab ? 'nav-tab-active' : ''; ?>">
-						<?php echo esc_html( $this->get_statistic_type_label( $type ) ); ?>
+				<?php foreach ( $tabs as $type ) { ?>
+					<a href="<?php echo esc_url( add_query_arg( 'tab', $type['key'], remove_query_arg( array( 'orderby', 'order' ), $base_url ) ) ); ?>" 
+						class="nav-tab <?php echo $type['key'] === $current_tab ? 'nav-tab-active' : ''; ?>">
+						<?php echo esc_html( $type['label'] ); ?>
 					</a>
 				<?php } ?>
 			</h2>
