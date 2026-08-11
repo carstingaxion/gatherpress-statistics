@@ -56,7 +56,7 @@ class Setup {
 			'events_multi_taxonomy'      => false,
 			'total_taxonomy_terms'       => false,
 			'taxonomy_terms_by_taxonomy' => false,
-			'total_attendees'            => true,
+			'total_attendees'            => is_plugin_active( 'gatherpress-attendee-count/plugin.php' ),
 		);
 		
 		$config = apply_filters( 'gatherpress_statistics_support_config', $default_config );

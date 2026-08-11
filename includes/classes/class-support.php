@@ -53,7 +53,7 @@ class Support {
 			'events_multi_taxonomy'      => true,
 			'total_taxonomy_terms'       => true,
 			'taxonomy_terms_by_taxonomy' => true,
-			'total_attendees'            => true,
+			'total_attendees'            => is_plugin_active( 'gatherpress-attendee-count/plugin.php' ),
 		);
 	}
 
