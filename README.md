@@ -94,14 +94,14 @@ See the "Styling with theme.json" section below for detailed examples of targeti
 
 ## Screenshots
 
-1. ![Block editor interface showing statistic type selection and filtering options](assets/screenshot-1.png)
-2. ![Counter style displaying total events with custom colors](assets/screenshot-2.png)
+1. ![Block editor interface showing statistic type selection and filtering options](.wordpress-org/screenshot-1.png)
+2. ![Counter style displaying total events with custom colors](.wordpress-org/screenshot-2.png)
 3. Card style showing events per topic with elegant design
 4. Minimal style integrated seamlessly into content
-5. ![Confetti style with interactive hover animation](assets/screenshot-5.png)
+5. ![Confetti style with interactive hover animation](.wordpress-org/screenshot-5.png)
 6. Inspector controls for configuring statistics and filters
 7. Multiple taxonomy filter panel for complex queries
-8. ![Conditional prefix/suffix settings for dynamic formatting](assets/screenshot-8.png)
+8. ![Conditional prefix/suffix settings for dynamic formatting](.wordpress-org/screenshot-8.png)
 
 ## Block Usage
 
