@@ -36,7 +36,7 @@ $show_label     = isset( $attributes['showLabel'] ) ? $attributes['showLabel'] :
 // Context-awareness: derive term(s) from the post this block is placed on
 // (a Single Event/Venue template, or the current Query Loop item) instead
 // of a manually picked term.
-$use_context_term  = isset( $attributes['useContextTerm'] ) ? (bool) $attributes['useContextTerm'] : false;
+$use_context_term   = isset( $attributes['useContextTerm'] ) ? (bool) $attributes['useContextTerm'] : false;
 $context_taxonomies = isset( $attributes['contextTaxonomies'] ) && is_array( $attributes['contextTaxonomies'] )
 	? $attributes['contextTaxonomies']
 	: array();

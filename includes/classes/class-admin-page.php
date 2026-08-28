@@ -241,7 +241,7 @@ class Admin_Page {
 	 *
 	 * @since 0.1.0
 	 *
-	 * @param string       $type     Statistic type slug.
+	 * @param string        $type     Statistic type slug.
 	 * @param ?\WP_Taxonomy $taxonomy Optional. Taxonomy this tab is scoped to.
 	 * @return string Human-readable label.
 	 */
