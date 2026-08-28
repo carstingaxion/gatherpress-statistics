@@ -94,6 +94,11 @@ register_activation_hook( __FILE__, 'gatherpress_statistics_activate_plugin' );
  * @return void
  */
 function gatherpress_statistics_deactivate_plugin(): void {
+	/**
+	 * Help phpstan understand $wpdb is global.
+	 * 
+	 * @var \wpdb  $wpdb WordPress database abstraction object.
+	 */
 	global $wpdb;
 	
 	$wpdb->query(

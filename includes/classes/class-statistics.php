@@ -83,6 +83,8 @@ class Statistics {
 		
 		$result = is_numeric( $result ) ? absint( $result ) : 0;
 		
-		return apply_filters( 'gatherpress_stats_calculate_' . $statistic_type, $result, $filters );
+		$return = apply_filters( 'gatherpress_stats_calculate_' . $statistic_type, $result, $filters );
+
+		return is_numeric( $return ) ? absint( $return ) : $result;
 	}
 }

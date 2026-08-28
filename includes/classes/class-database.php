@@ -50,8 +50,13 @@ class Database {
 	 * @return void
 	 */
 	public function create_archive_table(): void {
+		/**
+		 * Help phpstan understand $wpdb is global.
+		 * 
+		 * @var \wpdb  $wpdb WordPress database abstraction object.
+		 */
 		global $wpdb;
-		
+
 		$table_name      = $wpdb->prefix . 'gatherpress_statistics_archive';
 		$charset_collate = $wpdb->get_charset_collate();
 		
@@ -88,8 +93,13 @@ class Database {
 	 * @return int|null Statistic value or null if not found.
 	 */
 	public function get_archive_statistic( string $statistic_type, array $filters ): ?int {
+		/**
+		 * Help phpstan understand $wpdb is global.
+		 * 
+		 * @var \wpdb  $wpdb WordPress database abstraction object.
+		 */
 		global $wpdb;
-		
+
 		if ( empty( $filters['year'] ) || empty( $filters['month'] ) ) {
 			return null;
 		}

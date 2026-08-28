@@ -106,7 +106,7 @@ class Support {
 	 *
 	 * @since 0.1.0
 	 *
-	 * @return array<int, string> Array of post type slugs.
+	 * @return string[] Array of post type slugs.
 	 */
 	public function get_supported_post_types(): array {
 		$post_types = get_post_types_by_support( 'gatherpress_statistics' );
@@ -156,7 +156,7 @@ class Support {
 	public function get_post_type_singular_label( string $post_type ): string {
 		$post_type_object = get_post_type_object( $post_type );
 		
-		if ( $post_type_object && isset( $post_type_object->labels->singular_name ) ) {
+		if ( $post_type_object && isset( $post_type_object->labels->singular_name ) && is_string( $post_type_object->labels->singular_name ) ) {
 			return $post_type_object->labels->singular_name;
 		}
 		
@@ -174,7 +174,7 @@ class Support {
 	public function get_post_type_plural_label( string $post_type ): string {
 		$post_type_object = get_post_type_object( $post_type );
 		
-		if ( $post_type_object && isset( $post_type_object->labels->name ) ) {
+		if ( $post_type_object && isset( $post_type_object->labels->name ) && is_string( $post_type_object->labels->name ) ) {
 			return $post_type_object->labels->name;
 		}
 		

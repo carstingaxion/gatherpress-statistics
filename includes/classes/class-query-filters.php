@@ -52,6 +52,11 @@ class Query_Filters {
 	 * @return string Modified WHERE clause.
 	 */
 	public function filter_gatherpress_event_dates( string $where, \WP_Query $query ): string {
+		/**
+		 * Help phpstan understand $wpdb is global.
+		 * 
+		 * @var \wpdb  $wpdb WordPress database abstraction object.
+		 */
 		global $wpdb;
 
 		if ( empty( $query->query_vars['date_query'] ) ) {
