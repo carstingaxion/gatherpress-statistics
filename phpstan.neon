@@ -7,6 +7,8 @@ parameters:
         - includes/
         - src/
         - plugin.php
+    scanDirectories:
+        - wp-content/plugins/gatherpress
     excludePaths:
         analyse:
             - vendor/
