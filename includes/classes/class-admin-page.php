@@ -553,7 +553,7 @@ class Admin_Page {
 			<h2 class="nav-tab-wrapper">
 				<?php foreach ( $tabs as $type ) { ?>
 					<a href="<?php echo esc_url( add_query_arg( 'tab', $type['key'], remove_query_arg( array( 'orderby', 'order' ), $base_url ) ) ); ?>" 
-						class="nav-tab <?php echo $type['key'] === $current_tab ? 'nav-tab-active' : ''; ?>">
+						class="nav-tab <?php echo $type['key'] === $current_tab_key ? 'nav-tab-active' : ''; ?>">
 						<?php echo esc_html( $type['label'] ); ?>
 					</a>
 				<?php } ?>
@@ -579,7 +579,7 @@ class Admin_Page {
 			<div class="tablenav top">
 				<form method="get">
 					<input type="hidden" name="page" value="gatherpress-statistics-archive" />
-					<input type="hidden" name="tab" value="<?php echo esc_attr( $current_tab ); ?>" />
+					<input type="hidden" name="tab" value="<?php echo esc_attr( $current_tab_key ); ?>" />
 					
 					<select name="year">
 						<option value=""><?php esc_html_e( 'All Years', 'gatherpress-statistics' ); ?></option>
