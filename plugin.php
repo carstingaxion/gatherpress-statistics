@@ -130,6 +130,19 @@ function gatherpress_statistics_get_cached( string $statistic_type, array $filte
 }
 
 /**
+ * Resolve a context term id - convenience wrapper.
+ *
+ * @since 0.1.0
+ *
+ * @param int    $post_id  Context post id.
+ * @param string $taxonomy Taxonomy slug to look up on the post.
+ * @return int Resolved term id, or 0 when none found.
+ */
+function gatherpress_statistics_resolve_context_term( int $post_id, string $taxonomy ): int {
+	return GatherPressStatistics\Query::get_instance()->resolve_context_term( $post_id, $taxonomy );
+}
+
+/**
  * Clear cache - convenience wrapper.
  *
  * @since 0.1.0

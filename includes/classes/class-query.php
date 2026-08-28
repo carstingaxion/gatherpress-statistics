@@ -57,6 +57,35 @@ class Query {
 	}
 
 	/**
+	 * Resolve a taxonomy term id from a context post instead of a manual selection.
+	 *
+	 * Used when a block is configured to derive its filter term from the
+	 * post it is placed on (e.g. a Single Event template, or the current
+	 * item inside a Query Loop) rather than from a hard-coded term id.
+	 * When a post has more than one term in the taxonomy, the first one
+	 * returned by `wp_get_post_terms()` is used.
+	 *
+	 * @since 0.1.0
+	 *
+	 * @param int    $post_id  Context post id (0 when there is no context).
+	 * @param string $taxonomy Taxonomy slug to look up on the post.
+	 * @return int Term id, or 0 when the post has no term in that taxonomy.
+	 */
+	public function resolve_context_term( int $post_id, string $taxonomy ): int {
+		if ( $post_id <= 0 || empty( $taxonomy ) || ! taxonomy_exists( $taxonomy ) ) {
+			return 0;
+		}
+
+		$terms = wp_get_post_terms( $post_id, sanitize_key( $taxonomy ), array( 'fields' => 'ids' ) );
+
+		if ( is_wp_error( $terms ) || empty( $terms ) ) {
+			return 0;
+		}
+
+		return absint( reset( $terms ) );
+	}
+
+	/**
 	 * Count events with filters.
 	 *
 	 * @since 0.1.0
