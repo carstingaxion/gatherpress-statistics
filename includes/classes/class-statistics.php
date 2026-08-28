@@ -46,8 +46,8 @@ class Statistics {
 			return 0;
 		}
 
-		$statistic_type = is_string( $statistic_type ) ? $statistic_type : 'total_events';
-		$filters        = is_array( $filters ) ? $filters : array();
+		$statistic_type = ! empty( $statistic_type ) ? $statistic_type : 'total_events';
+		$filters        = ! empty( $filters ) ? $filters : array();
 		
 		if ( empty( $filters['event_query'] ) || ! in_array( $filters['event_query'], array( 'upcoming', 'past' ), true ) ) {
 			return 0;

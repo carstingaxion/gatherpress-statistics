@@ -111,7 +111,7 @@ class Support {
 	public function get_supported_post_types(): array {
 		$post_types = get_post_types_by_support( 'gatherpress_statistics' );
 		
-		if ( empty( $post_types ) || ! is_array( $post_types ) ) {
+		if ( empty( $post_types ) ) {
 			return array();
 		}
 		
@@ -140,6 +140,10 @@ class Support {
 	 */
 	public function is_supported_post( int $post_id ): bool {
 		$post = get_post( $post_id );
+
+		if ( ! $post instanceof \WP_Post ) {
+			return false;
+		}
 		
 		return post_type_supports( $post->post_type, 'gatherpress_statistics' ) 
 			&& $post->post_status === 'publish';

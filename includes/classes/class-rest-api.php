@@ -90,7 +90,7 @@ class Rest_Api {
 		
 		$formatted_taxonomies = array();
 		foreach ( $taxonomies as $taxonomy ) {
-			if ( isset( $taxonomy->name ) && isset( $taxonomy->labels->name ) ) {
+			if ( isset( $taxonomy->labels->name ) ) {
 				$formatted_taxonomies[] = array(
 					'slug' => $taxonomy->name,
 					'name' => $taxonomy->labels->name,
