@@ -11,6 +11,7 @@
 		"events"
 	],
 	"category": "widgets",
+	"usesContext": [ "postId", "postType" ],
 	"icon": "chart-bar",
 	"description": "Display dynamically calculated statistics about your GatherPress events with beautiful, cached counters.",
 	"example": {
@@ -82,6 +83,14 @@
 		"conditionalThreshold": {
 			"type": "number",
 			"default": 10
+		},
+		"useContextTerm": {
+			"type": "boolean",
+			"default": false
+		},
+		"contextTaxonomies": {
+			"type": "array",
+			"default": []
 		}
 	},
 	"supports": {
