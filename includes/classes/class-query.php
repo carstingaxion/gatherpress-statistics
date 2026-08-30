@@ -8,6 +8,7 @@
 namespace GatherPressStatistics;
 
 use GatherPress\Core;
+use WP_Query;
 
 // Exit if accessed directly.
 defined( 'ABSPATH' ) || exit; // @codeCoverageIgnore
@@ -39,14 +40,14 @@ class Query {
 	private function build_date_query( array $filters ): array {
 		$date_query = array();
 		
-		if ( ! empty( $filters['year'] ) ) {
+		if ( ! empty( $filters['year'] ) && is_string( $filters['year'] ) ) {
 			$year = absint( $filters['year'] );
 			if ( $year > 0 ) {
 				$date_query['year'] = $year;
 			}
 		}
 		
-		if ( ! empty( $filters['month'] ) ) {
+		if ( ! empty( $filters['month'] ) && is_string( $filters['month'] ) ) {
 			$month = absint( $filters['month'] );
 			if ( $month >= 1 && $month <= 12 ) {
 				$date_query['month'] = $month;
@@ -100,8 +101,6 @@ class Query {
 			return 0;
 		}
 		
-		$filters = is_array( $filters ) ? $filters : array();
-		
 		$args = array(
 			'post_type'      => $post_types,
 			'post_status'    => 'publish',
@@ -121,7 +120,7 @@ class Query {
 			$args['date_query'] = array( $date_query );
 		}
 		
-		if ( ! empty( $filters['taxonomy'] ) && ! empty( $filters['term_id'] ) ) {
+		if ( ! empty( $filters['taxonomy'] ) && is_string( $filters['taxonomy'] ) && ! empty( $filters['term_id'] ) && is_numeric( $filters['term_id'] ) ) {
 			if ( taxonomy_exists( $filters['taxonomy'] ) ) {
 				$args['tax_query'] = array(
 					array(
@@ -149,7 +148,7 @@ class Query {
 			}
 		}
 		
-		$query = new \WP_Query( $args );
+		$query = new WP_Query( $args );
 		
 		return absint( $query->found_posts );
 	}
@@ -169,7 +168,6 @@ class Query {
 			return 0;
 		}
 		
-		$filters  = is_array( $filters ) ? $filters : array();
 		$taxonomy = isset( $filters['taxonomy'] ) && is_string( $filters['taxonomy'] ) ? $filters['taxonomy'] : '';
 		
 		if ( empty( $taxonomy ) || ! taxonomy_exists( $taxonomy ) ) {
@@ -179,7 +177,7 @@ class Query {
 		$args = array(
 			'taxonomy'   => sanitize_key( $taxonomy ),
 			'hide_empty' => true,
-			'object_ids' => null,
+			'object_ids' => array(), // Will be filled with post IDs later.
 		);
 		
 		$query_args = array(
@@ -194,15 +192,22 @@ class Query {
 			$query_args['date_query'] = array( $date_query );
 		}
 		
-		$post_query = new \WP_Query( $query_args );
+		$post_query = new WP_Query( $query_args );
 		
 		if ( ! empty( $post_query->posts ) ) {
-			$args['object_ids'] = $post_query->posts;
+
+			/**
+			 * This is for sure an array of int, because of 'fields' => 'ids'.
+			 *
+			 * @var int[] $postids
+			 */
+			$postids = $post_query->posts;
+			$args['object_ids'] = $postids;
 		}
 		
-		$terms = \get_terms( $args );
+		$terms = get_terms( $args );
 		
-		if ( is_wp_error( $terms ) || ! is_array( $terms ) ) {
+		if ( is_wp_error( $terms ) ) {
 			return 0;
 		}
 		
@@ -224,11 +229,9 @@ class Query {
 			return 0;
 		}
 		
-		$filters = is_array( $filters ) ? $filters : array();
-		
 		$count_taxonomy  = isset( $filters['count_taxonomy'] ) && is_string( $filters['count_taxonomy'] ) ? $filters['count_taxonomy'] : '';
 		$filter_taxonomy = isset( $filters['filter_taxonomy'] ) && is_string( $filters['filter_taxonomy'] ) ? $filters['filter_taxonomy'] : '';
-		$term_id         = isset( $filters['term_id'] ) ? absint( $filters['term_id'] ) : 0;
+		$term_id         = isset( $filters['term_id'] ) && is_numeric( $filters['term_id'] ) ? absint( $filters['term_id'] ) : 0;
 		
 		if ( empty( $count_taxonomy ) || empty( $filter_taxonomy ) || $term_id === 0 ) {
 			return 0;
@@ -257,14 +260,19 @@ class Query {
 			$args['date_query'] = array( $date_query );
 		}
 		
-		$query = new \WP_Query( $args );
+		$query = new WP_Query( $args );
 		$terms = array();
 		
-		if ( is_array( $query->posts ) ) {
+		if ( ! empty( $query->posts ) ) {
+			/**
+			 * This is for sure an int, because of 'fields' => 'ids'.
+			 *
+			 * @var int $post_id
+			 */
 			foreach ( $query->posts as $post_id ) {
 				$post_terms = wp_get_post_terms( $post_id, sanitize_key( $count_taxonomy ), array( 'fields' => 'ids' ) );
 				
-				if ( ! is_wp_error( $post_terms ) && is_array( $post_terms ) && ! empty( $post_terms ) ) {
+				if ( ! is_wp_error( $post_terms ) && ! empty( $post_terms ) ) {
 					$terms = array_merge( $terms, $post_terms );
 				}
 			}
@@ -287,8 +295,7 @@ class Query {
 		if ( empty( $post_types ) ) {
 			return 0;
 		}
-		$filters = is_array( $filters ) ? $filters : array();
-		
+
 		$args = array(
 			'post_type'      => $post_types,
 			'post_status'    => 'publish',
@@ -308,7 +315,7 @@ class Query {
 			$args['date_query'] = array( $date_query );
 		}
 		
-		if ( ! empty( $filters['taxonomy'] ) && ! empty( $filters['term_id'] ) ) {
+		if ( ! empty( $filters['taxonomy'] ) && is_string( $filters['taxonomy'] ) && ! empty( $filters['term_id'] ) && is_numeric( $filters['term_id'] ) ) {
 			if ( taxonomy_exists( $filters['taxonomy'] ) ) {
 				$args['tax_query'] = array(
 					array(
@@ -336,12 +343,17 @@ class Query {
 			}
 		}
 		
-		$query           = new \WP_Query( $args );
+		$query           = new WP_Query( $args );
 		$total_attendees = 0;
 		
-		if ( is_array( $query->posts ) && ! empty( $query->posts ) ) {
+		if ( ! empty( $query->posts ) ) {
+			/**
+			 * This is for sure an int, because of 'fields' => 'ids'.
+			 *
+			 * @var int $post_id
+			 */
 			foreach ( $query->posts as $post_id ) {
-				$attendee_count = (int) get_post_meta( $post_id, 'gatherpress_attendee_count', true );
+				$attendee_count = get_post_meta( $post_id, 'gatherpress_attendee_count', true );
 				
 				if ( is_numeric( $attendee_count ) ) {
 					$total_attendees += absint( $attendee_count );

@@ -390,8 +390,7 @@ class Admin_Page {
 		 */
 		global $wpdb;
 		
-		$database     = Database::get_instance();
-		$table_name   = sprintf( $database::TABLE_FORMAT, $wpdb->prefix );
+		$table_name   = sprintf( Database::TABLE_FORMAT, $wpdb->prefix );
 		
 		$selected_year     = isset( $_GET['year'] ) ? absint( $_GET['year'] ) : null;
 		$selected_month    = isset( $_GET['month'] ) ? absint( $_GET['month'] ) : null;

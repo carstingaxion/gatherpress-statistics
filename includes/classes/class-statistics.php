@@ -80,7 +80,8 @@ class Statistics {
 				$result = Query::get_instance()->count_attendees( $filters );
 				break;
 		}
-		
+
+		/* @phpstan-ignore-next-line */
 		$result = is_numeric( $result ) ? absint( $result ) : 0;
 		
 		$return = apply_filters( 'gatherpress_stats_calculate_' . $statistic_type, $result, $filters );

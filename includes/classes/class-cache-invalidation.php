@@ -8,6 +8,7 @@
 namespace GatherPressStatistics;
 
 use GatherPress\Core;
+use WP_Post;
 
 // Exit if accessed directly.
 defined( 'ABSPATH' ) || exit; // @codeCoverageIgnore
@@ -55,14 +56,10 @@ class Cache_Invalidation {
 	 *
 	 * @param string   $new_status New post status.
 	 * @param string   $old_status Old post status.
-	 * @param \WP_Post $post       Post object.
+	 * @param WP_Post $post       Post object.
 	 * @return void
 	 */
-	public function clear_cache_on_status_change( string $new_status, string $old_status, $post ): void {
-		if ( ! is_object( $post ) || ! isset( $post->post_type ) ) {
-			return;
-		}
-		
+	public function clear_cache_on_status_change( string $new_status, string $old_status, WP_Post $post ): void {
 		if ( ! post_type_supports( $post->post_type, 'gatherpress_statistics' ) ) {
 			return;
 		}
@@ -123,15 +120,13 @@ class Cache_Invalidation {
 		
 		$supported_taxonomies = Taxonomy::get_instance()->get_filtered_taxonomies();
 
-		if ( empty( $supported_taxonomies ) || ! is_array( $supported_taxonomies ) ) {
+		if ( empty( $supported_taxonomies ) ) {
 			return;
 		}
 
 		$taxonomy_slugs = array();
 		foreach ( $supported_taxonomies as $tax_obj ) {
-			if ( isset( $tax_obj->name ) ) {
-				$taxonomy_slugs[] = $tax_obj->name;
-			}
+			$taxonomy_slugs[] = $tax_obj->name;
 		}
 
 		if ( in_array( $taxonomy, $taxonomy_slugs, true ) ) {

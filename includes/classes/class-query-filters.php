@@ -69,7 +69,7 @@ class Query_Filters {
 		}
 
 		$date_query = $query->query_vars['date_query'];
-		if ( ! is_array( $date_query ) || empty( $date_query ) ) {
+		if ( ! is_array( $date_query ) ) {
 			return $where;
 		}
 
@@ -77,12 +77,12 @@ class Query_Filters {
 
 		$date_conditions = array();
 
-		if ( ! empty( $date_filter['year'] ) ) {
+		if ( ! empty( $date_filter['year'] ) && is_string( $date_filter['year'] ) ) {
 			$year              = absint( $date_filter['year'] );
 			$date_conditions[] = $wpdb->prepare( 'YEAR(ge.datetime_start_gmt) = %d', $year );
 		}
 
-		if ( ! empty( $date_filter['month'] ) ) {
+		if ( ! empty( $date_filter['month'] ) && is_string( $date_filter['month'] ) ) {
 			$month             = absint( $date_filter['month'] );
 			$date_conditions[] = $wpdb->prepare( 'MONTH(ge.datetime_start_gmt) = %d', $month );
 		}

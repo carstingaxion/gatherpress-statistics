@@ -117,14 +117,14 @@ class Database {
 		// Remove year and month from filters for hash calculation
 		$filter_copy = $filters;
 		unset( $filter_copy['year'], $filter_copy['month'] );
-		$filters_hash = md5( wp_json_encode( $filter_copy ) );
+		$filters_hash = md5( (string) wp_json_encode( $filter_copy ) );
 		
 		$post_types = Support::get_instance()->get_supported_post_types();
 		$post_type  = ! empty( $post_types ) ? $post_types[0] : 'gatherpress_event';
 		
 		$result = $wpdb->get_var(
 			$wpdb->prepare(
-				"SELECT statistic_value FROM {$table_name}
+				"SELECT statistic_value FROM %i
 				 WHERE post_type = %s
 				 AND statistic_type = %s
 				 AND statistic_year = %d
@@ -132,6 +132,7 @@ class Database {
 				 AND filters_hash = %s
 				 ORDER BY archived_at DESC
 				 LIMIT 1",
+				$table_name,
 				$post_type,
 				$statistic_type,
 				$filters['year'],
