@@ -138,7 +138,7 @@ class Query {
 					$tax_query[] = array(
 						'taxonomy' => sanitize_key( $taxonomy ),
 						'field'    => 'term_id',
-						'terms'    => array_map( 'absint', $term_ids ),
+						'terms'    => $term_ids,
 					);
 				}
 			}
@@ -333,7 +333,7 @@ class Query {
 					$tax_query[] = array(
 						'taxonomy' => sanitize_key( $taxonomy ),
 						'field'    => 'term_id',
-						'terms'    => array_map( 'absint', $term_ids ),
+						'terms'    => $term_ids,
 					);
 				}
 			}

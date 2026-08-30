@@ -37,12 +37,10 @@ $show_label     = isset( $attributes['showLabel'] ) ? $attributes['showLabel'] :
 // (a Single Event/Venue template, or the current Query Loop item) instead
 // of a manually picked term.
 $use_context_term   = isset( $attributes['useContextTerm'] ) ? (bool) $attributes['useContextTerm'] : false;
-$context_taxonomies = isset( $attributes['contextTaxonomies'] ) && is_array( $attributes['contextTaxonomies'] )
-	? $attributes['contextTaxonomies']
-	: array();
+$context_taxonomies = isset( $attributes['contextTaxonomies'] ) ? $attributes['contextTaxonomies'] : array();
 
 $context_post_id = 0;
-if ( isset( $block ) && $block instanceof WP_Block && ! empty( $block->context['postId'] ) ) {
+if ( isset( $block ) && $block instanceof WP_Block && ! empty( $block->context['postId'] ) && is_numeric( $block->context['postId'] ) ) {
 	$context_post_id = absint( $block->context['postId'] );
 } else {
 	$context_post_id = absint( get_queried_object_id() );
@@ -130,7 +128,7 @@ if ( 'events_multi_taxonomy' === $statistic_type ) {
 	// the context post instead of (or in addition to) a manual selection.
 	if ( $context_post_id > 0 ) {
 		foreach ( $context_taxonomies as $context_taxonomy_slug ) {
-			if ( ! is_string( $context_taxonomy_slug ) || empty( $context_taxonomy_slug ) ) {
+			if ( empty( $context_taxonomy_slug ) ) {
 				continue;
 			}
 
@@ -154,7 +152,7 @@ if ( 'events_multi_taxonomy' === $statistic_type ) {
 $count = gatherpress_statistics_get_cached( $statistic_type, $filters );
 
 // Don't display if count is 0.
-if ( $count === 0 || ! is_int( $count ) ) {
+if ( $count === 0 ) {
 	return;
 }
 

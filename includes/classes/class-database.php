@@ -86,7 +86,10 @@ class Database {
 				KEY filters_lookup (filters_hash)
 				) {$charset_collate};";
 		
-		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+		if ( ! function_exists( 'dbDelta' ) ) {
+			// @phpstan-ignore requireOnce.fileNotFound
+			require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+		}
 		dbDelta( $sql );
 	}
 	
