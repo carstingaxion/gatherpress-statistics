@@ -108,7 +108,7 @@ class Cache {
 			return 0;
 		}
 		
-		// Check if archive is enabled and we have year/month filters
+		// Check if archive is enabled and we have year/month filters.
 		if ( Plugin::get_instance()->is_archive_enabled() && ! empty( $filters['year'] ) && ! empty( $filters['month'] ) ) {
 			$archive_value = Database::get_instance()->get_archive_statistic( $statistic_type, $filters );
 			if ( $archive_value !== null ) {
@@ -222,9 +222,10 @@ class Cache {
 		if ( in_array( 'taxonomy_terms_by_taxonomy', $supported_types, true ) 
 			&& count( $taxonomies ) > 1 ) {
 			$taxonomy_array = array_values( $taxonomies );
+			$taxonomy_count = count( $taxonomy_array );
 			
-			for ( $i = 0; $i < count( $taxonomy_array ); $i++ ) {
-				for ( $j = 0; $j < count( $taxonomy_array ); $j++ ) {
+			for ( $i = 0; $i < $taxonomy_count; $i++ ) {
+				for ( $j = 0; $j < $taxonomy_count; $j++ ) {
 					if ( $i !== $j ) {
 						$filter_tax = $taxonomy_array[ $i ];
 						$count_tax  = $taxonomy_array[ $j ];
@@ -304,7 +305,7 @@ class Cache {
 		 */
 		global $wpdb;
 		
-		$wpdb->query(
+		$wpdb->query( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 			"DELETE FROM {$wpdb->options} 
 			WHERE option_name LIKE '_transient_gatherpress_stats_%' 
 			OR option_name LIKE '_transient_timeout_gatherpress_stats_%'"

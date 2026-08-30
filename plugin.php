@@ -101,7 +101,7 @@ function gatherpress_statistics_deactivate_plugin(): void {
 	 */
 	global $wpdb;
 	
-	$wpdb->query(
+	$wpdb->query( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 		"DELETE FROM {$wpdb->options} 
 		WHERE option_name LIKE '_transient_gatherpress_stats_%' 
 		OR option_name LIKE '_transient_timeout_gatherpress_stats_%'"

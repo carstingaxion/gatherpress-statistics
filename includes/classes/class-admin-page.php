@@ -8,6 +8,7 @@
 namespace GatherPressStatistics;
 
 use GatherPress\Core;
+use WP_Taxonomy;
 
 // Exit if accessed directly.
 defined( 'ABSPATH' ) || exit; // @codeCoverageIgnore
@@ -73,10 +74,6 @@ class Admin_Page {
 		 */
 		$asset = include $asset_file; // phpcs:ignore WordPressVIPMinimum.Files.IncludingFile.UsingVariable
 
-		if ( ! is_array( $asset ) || ! isset( $asset['dependencies'], $asset['version'] ) ) {
-			return;
-		}
-
 		wp_enqueue_script(
 			'gatherpress-statistics-admin-page',
 			plugins_url( 'build/admin/page/index.js', GATHERPRESS_STATISTICS_CORE_PATH . '/plugin.php' ),
@@ -126,7 +123,7 @@ class Admin_Page {
 			return;
 		}
 
-		if ( ! isset( $_POST['gatherpress_archive_nonce'] ) || 
+		if ( ! isset( $_POST['gatherpress_archive_nonce'] ) || ! is_string( $_POST['gatherpress_archive_nonce'] ) || 
 			! wp_verify_nonce( $_POST['gatherpress_archive_nonce'], 'gatherpress_generate_archive' ) ) {
 			return;
 		}
@@ -135,8 +132,8 @@ class Admin_Page {
 			return;
 		}
 
-		$year  = isset( $_POST['archive_year'] ) ? absint( $_POST['archive_year'] ) : 0;
-		$month = isset( $_POST['archive_month'] ) ? absint( $_POST['archive_month'] ) : 0;
+		$year  = isset( $_POST['archive_year'] ) && is_numeric( $_POST['archive_year'] ) ? absint( $_POST['archive_year'] ) : 0;
+		$month = isset( $_POST['archive_month'] ) && is_numeric( $_POST['archive_month'] ) ? absint( $_POST['archive_month'] ) : 0;
 
 		if ( ! $year || ! $month || $month < 1 || $month > 12 ) {
 			add_settings_error(
@@ -220,10 +217,6 @@ class Admin_Page {
 			}
 
 			foreach ( $taxonomies as $taxonomy ) {
-				if ( ! isset( $taxonomy->name ) ) {
-					continue;
-				}
-
 				$tabs[] = array(
 					'key'            => $type . '::' . $taxonomy->name,
 					'statistic_type' => $type,
@@ -241,17 +234,17 @@ class Admin_Page {
 	 *
 	 * @since 0.1.0
 	 *
-	 * @param string        $type     Statistic type slug.
-	 * @param ?\WP_Taxonomy $taxonomy Optional. Taxonomy this tab is scoped to.
+	 * @param string       $type     Statistic type slug.
+	 * @param ?WP_Taxonomy $taxonomy Optional. Taxonomy this tab is scoped to.
 	 * @return string Human-readable label.
 	 */
-	private function get_statistic_type_label( string $type, ?\WP_Taxonomy $taxonomy = null ): string {
+	private function get_statistic_type_label( string $type, ?WP_Taxonomy $taxonomy = null ): string {
 		$post_types   = Support::get_instance()->get_supported_post_types();
 		$post_type    = ! empty( $post_types ) ? $post_types[0] : 'gatherpress_event';
 		$plural_label = Support::get_instance()->get_post_type_plural_label( $post_type );
 
 		if ( null !== $taxonomy ) {
-			$taxonomy_label = isset( $taxonomy->labels->singular_name ) ? $taxonomy->labels->singular_name : $taxonomy->label;
+			$taxonomy_label = isset( $taxonomy->labels->singular_name ) && is_string( $taxonomy->labels->singular_name ) ? $taxonomy->labels->singular_name : $taxonomy->name;
 
 			if ( 'total_attendees' === $type ) {
 				return sprintf(
@@ -285,9 +278,9 @@ class Admin_Page {
 	 *
 	 * @since 0.1.0
 	 *
-	 * @param array  $statistics Array of statistics from database.
-	 * @param string $type       Current statistic type.
-	 * @return array Chart data structure.
+	 * @param array<\stdClass> $statistics Array of statistics from database.
+	 * @param string           $type       Current statistic type.
+	 * @return array<string, string[]|array<string, string|integer|float>>             Chart data structure.
 	 */
 	private function prepare_chart_data( array $statistics, string $type ): array {
 		if ( empty( $statistics ) ) {
@@ -390,7 +383,7 @@ class Admin_Page {
 		 */
 		global $wpdb;
 		
-		$table_name   = sprintf( Database::TABLE_FORMAT, $wpdb->prefix );
+		$table_name = sprintf( Database::TABLE_FORMAT, $wpdb->prefix );
 		
 		$selected_year     = isset( $_GET['year'] ) ? absint( $_GET['year'] ) : null;
 		$selected_month    = isset( $_GET['month'] ) ? absint( $_GET['month'] ) : null;
@@ -484,8 +477,8 @@ class Admin_Page {
 		
 		$statistics = $wpdb->get_results( $query );
 		
-		$current_year  = (int) date( 'Y' );
-		$current_month = (int) date( 'n' );
+		$current_year  = (int) gmdate( 'Y' );
+		$current_month = (int) gmdate( 'n' );
 		
 		$base_url = add_query_arg(
 			array(
@@ -524,7 +517,7 @@ class Admin_Page {
 							<td>
 								<select name="archive_year" id="archive_year" required>
 									<?php for ( $y = $current_year; $y >= 2020; $y-- ) { ?>
-										<option value="<?php echo esc_attr( $y ); ?>"><?php echo esc_html( $y ); ?></option>
+										<option value="<?php echo esc_attr( (string) $y ); ?>"><?php echo esc_html( (string) $y ); ?></option>
 									<?php } ?>
 								</select>
 							</td>
@@ -536,7 +529,7 @@ class Admin_Page {
 							<td>
 								<select name="archive_month" id="archive_month" required>
 									<?php for ( $m = 1; $m <= 12; $m++ ) { ?>
-										<option value="<?php echo esc_attr( $m ); ?>" <?php selected( $m, $current_month ); ?>>
+										<option value="<?php echo esc_attr( (string) $m ); ?>" <?php selected( $m, $current_month ); ?>>
 											<?php echo esc_html( date_i18n( 'F', mktime( 0, 0, 0, $m, 1 ) ) ); ?>
 										</option>
 									<?php } ?>

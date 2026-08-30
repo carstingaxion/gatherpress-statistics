@@ -46,7 +46,7 @@ class Cache_Invalidation {
 		add_action( 'create_term', array( $this, 'clear_cache_on_term_change' ), 10, 3 );
 		add_action( 'edit_term', array( $this, 'clear_cache_on_term_change' ), 10, 3 );
 		add_action( 'delete_term', array( $this, 'clear_cache_on_term_change' ), 10, 3 );
-		add_action( 'set_object_terms', array( $this, 'clear_cache_on_term_relationship' ), 10, 3 );
+		add_action( 'set_object_terms', array( $this, 'clear_cache_on_term_relationship' ) );
 	}
 
 	/**
@@ -54,8 +54,8 @@ class Cache_Invalidation {
 	 *
 	 * @since 0.1.0
 	 *
-	 * @param string   $new_status New post status.
-	 * @param string   $old_status Old post status.
+	 * @param string  $new_status New post status.
+	 * @param string  $old_status Old post status.
 	 * @param WP_Post $post       Post object.
 	 * @return void
 	 */
@@ -139,12 +139,10 @@ class Cache_Invalidation {
 	 *
 	 * @since 0.1.0
 	 *
-	 * @param int             $object_id Object ID.
-	 * @param array<int, int> $terms     Term IDs.
-	 * @param array<int, int> $tt_ids    Term taxonomy IDs.
+	 * @param int $object_id Object ID.
 	 * @return void
 	 */
-	public function clear_cache_on_term_relationship( int $object_id, array $terms, array $tt_ids ): void {
+	public function clear_cache_on_term_relationship( int $object_id ): void {
 		if ( Support::get_instance()->is_supported_post( $object_id ) ) {
 			Cache::get_instance()->clear_cache();
 		}

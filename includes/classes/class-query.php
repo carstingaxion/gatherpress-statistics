@@ -122,7 +122,7 @@ class Query {
 		
 		if ( ! empty( $filters['taxonomy'] ) && is_string( $filters['taxonomy'] ) && ! empty( $filters['term_id'] ) && is_numeric( $filters['term_id'] ) ) {
 			if ( taxonomy_exists( $filters['taxonomy'] ) ) {
-				$args['tax_query'] = array(
+				$args['tax_query'] = array( // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_tax_query
 					array(
 						'taxonomy' => sanitize_key( $filters['taxonomy'] ),
 						'field'    => 'term_id',
@@ -144,7 +144,7 @@ class Query {
 			}
 			
 			if ( count( $tax_query ) > 1 ) {
-				$args['tax_query'] = $tax_query;
+				$args['tax_query'] = $tax_query; // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_tax_query
 			}
 		}
 		
@@ -201,7 +201,7 @@ class Query {
 			 *
 			 * @var int[] $postids
 			 */
-			$postids = $post_query->posts;
+			$postids            = $post_query->posts;
 			$args['object_ids'] = $postids;
 		}
 		
@@ -246,7 +246,7 @@ class Query {
 			'post_status'    => 'publish',
 			'posts_per_page' => -1,
 			'fields'         => 'ids',
-			'tax_query'      => array(
+			'tax_query'      => array( // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_tax_query
 				array(
 					'taxonomy' => sanitize_key( $filter_taxonomy ),
 					'field'    => 'term_id',
@@ -317,7 +317,7 @@ class Query {
 		
 		if ( ! empty( $filters['taxonomy'] ) && is_string( $filters['taxonomy'] ) && ! empty( $filters['term_id'] ) && is_numeric( $filters['term_id'] ) ) {
 			if ( taxonomy_exists( $filters['taxonomy'] ) ) {
-				$args['tax_query'] = array(
+				$args['tax_query'] = array( // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_tax_query
 					array(
 						'taxonomy' => sanitize_key( $filters['taxonomy'] ),
 						'field'    => 'term_id',
@@ -339,7 +339,7 @@ class Query {
 			}
 			
 			if ( count( $tax_query ) > 1 ) {
-				$args['tax_query'] = $tax_query;
+				$args['tax_query'] = $tax_query; // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_tax_query
 			}
 		}
 		
