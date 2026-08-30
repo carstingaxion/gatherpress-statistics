@@ -44,7 +44,17 @@ class Support {
 		$supports = get_all_post_type_supports( $post_type );
 		
 		if ( isset( $supports['gatherpress_statistics'] ) && is_array( $supports['gatherpress_statistics'] ) ) {
-			return reset( $supports['gatherpress_statistics'] );
+			$config = reset( $supports['gatherpress_statistics'] );
+
+			if ( is_array( $config ) ) {
+				$normalized_config = array();
+
+				foreach ( $config as $statistic_type => $enabled ) {
+					$normalized_config[ (string) $statistic_type ] = (bool) $enabled;
+				}
+
+				return $normalized_config;
+			}
 		}
 		
 		return array(
