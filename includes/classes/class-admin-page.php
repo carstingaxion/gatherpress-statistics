@@ -383,9 +383,15 @@ class Admin_Page {
 	 * @return void
 	 */
 	public function render_admin_page(): void {
+		/**
+		 * Help phpstan understand $wpdb is global.
+		 * 
+		 * @var \wpdb  $wpdb WordPress database abstraction object.
+		 */
 		global $wpdb;
 		
-		$table_name = $wpdb->prefix . 'gatherpress_statistics_archive';
+		$database     = Database::get_instance();
+		$table_name   = sprintf( $database::TABLE_FORMAT, $wpdb->prefix );
 		
 		$selected_year     = isset( $_GET['year'] ) ? absint( $_GET['year'] ) : null;
 		$selected_month    = isset( $_GET['month'] ) ? absint( $_GET['month'] ) : null;

@@ -22,6 +22,14 @@ class Database {
 	use Core\Traits\Singleton;
 
 	/**
+	 * Format for the database table name used by GatherPress statistics.
+	 *
+	 * @since 0.2.0
+	 * @var string $TABLE_FORMAT
+	 */
+	const TABLE_FORMAT = '%sgatherpress_statistics_archive';
+
+	/**
 	 * Constructor.
 	 *
 	 * @since 0.1.0
@@ -57,7 +65,7 @@ class Database {
 		 */
 		global $wpdb;
 
-		$table_name      = $wpdb->prefix . 'gatherpress_statistics_archive';
+		$table_name      = sprintf( self::TABLE_FORMAT, $wpdb->prefix );
 		$charset_collate = $wpdb->get_charset_collate();
 		
 		$sql = 
@@ -104,7 +112,7 @@ class Database {
 			return null;
 		}
 		
-		$table_name = $wpdb->prefix . 'gatherpress_statistics_archive';
+		$table_name = sprintf( self::TABLE_FORMAT, $wpdb->prefix );
 		
 		// Remove year and month from filters for hash calculation
 		$filter_copy = $filters;

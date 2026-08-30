@@ -66,9 +66,15 @@ class Archive {
 	 * @return bool True on success, false on failure.
 	 */
 	public function archive_statistics_for_month( int $year, int $month ): bool {
+		/**
+		 * Help phpstan understand $wpdb is global.
+		 * 
+		 * @var \wpdb  $wpdb WordPress database abstraction object.
+		 */
 		global $wpdb;
 		
-		$table_name   = $wpdb->prefix . 'gatherpress_statistics_archive';
+		$database     = Database::get_instance();
+		$table_name   = sprintf( $database::TABLE_FORMAT, $wpdb->prefix );
 		$current_time = current_time( 'mysql' );
 		
 		$configs = Cache::get_instance()->get_common_configs();
