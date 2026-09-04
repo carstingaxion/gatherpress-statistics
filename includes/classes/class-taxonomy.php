@@ -76,15 +76,32 @@ class Taxonomy {
 			return array();
 		}
 		
+		/**
+		 * Filters taxonomies excluded from statistics generation and block editor selection.
+		 *
+		 * @since 0.1.0
+		 *
+		 * @param array<int, string> $excluded_taxonomies Taxonomy slugs to exclude. Default: `array()`.
+		 * @param bool                $for_editor          Whether this call is for editor selection
+		 *                                                   (true) or statistics generation (false).
+		 *
+		 * @example
+		 * ```php
+		 * add_filter( 'gatherpress_statistics_excluded_taxonomies', function ( array $excluded, bool $for_editor ): array {
+		 *     $excluded[] = 'post_tag';
+		 *     $excluded[] = 'custom_event_type';
+		 *     return $excluded;
+		 * }, 10, 2 );
+		 * ```
+		 */
 		$excluded_taxonomies = apply_filters(
 			'gatherpress_statistics_excluded_taxonomies',
 			array(),
 			$for_editor
 		);
-		
-		if ( ! is_array( $excluded_taxonomies ) ) {
-			$excluded_taxonomies = array();
-		}
+
+		// @phpstan-ignore-next-line
+		$excluded_taxonomies = is_array( $excluded_taxonomies ) ? $excluded_taxonomies : array();
 		
 		$filtered_taxonomies = array();
 		foreach ( $taxonomies as $taxonomy ) {

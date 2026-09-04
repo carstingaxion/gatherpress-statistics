@@ -66,11 +66,20 @@ class Plugin {
 	 */
 	public function is_archive_enabled(): bool {
 		/**
-		 * Filter whether archive functionality is enabled.
+		 * Filters whether the Statistics Archive Dashboard is enabled.
+		 *
+		 * Disabling this skips registering the archive database table, the
+		 * Dashboard → Statistics Archive admin page, and the monthly archive
+		 * cron job.
 		 *
 		 * @since 0.1.0
 		 *
 		 * @param bool $enabled Whether archive is enabled. Default true.
+		 *
+		 * @example
+		 * ```php
+		 * add_filter( 'gatherpress_statistics_enable_archive', '__return_false' );
+		 * ```
 		 */
 		return (bool) apply_filters( 'gatherpress_statistics_enable_archive', true );
 	}

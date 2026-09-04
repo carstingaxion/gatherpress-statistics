@@ -74,11 +74,27 @@ class Cache {
 	 * @return int Cache expiration time in seconds.
 	 */
 	public function get_cache_expiration(): int {
+		/**
+		 * Filters the statistics cache expiration time.
+		 *
+		 * @since 0.1.0
+		 *
+		 * @param int $expiration Cache expiration time in seconds. Default: `12 * HOUR_IN_SECONDS`.
+		 *
+		 * @example
+		 * ```php
+		 * // Cache for 6 hours instead of the 12-hour default.
+		 * add_filter( 'gatherpress_statistics_cache_expiration', function ( int $expiration ): int {
+		 *     return 6 * HOUR_IN_SECONDS;
+		 * } );
+		 * ```
+		 */
 		$expiration = apply_filters(
 			'gatherpress_statistics_cache_expiration',
 			12 * HOUR_IN_SECONDS
 		);
-		
+
+		// @phpstan-ignore-next-line
 		if ( ! is_numeric( $expiration ) || $expiration < 1 ) {
 			$expiration = 12 * HOUR_IN_SECONDS;
 		}
