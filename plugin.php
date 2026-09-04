@@ -2,7 +2,7 @@
 /**
  * Plugin Name:       GatherPress Statistics
  * Description:       Display dynamically calculated statistics about your GatherPress events with beautiful, cached counters.
- * Version:           0.1.0
+ * Version:           0.2.0
  * Requires at least: 7.0
  * Requires PHP:      7.4
  * Requires Plugins:  gatherpress

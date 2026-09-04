@@ -1,6 +1,6 @@
 # GatherPress Statistics
 
-Stable tag: 0.1.0  
+Stable tag: 0.2.0  
 Tested up to: 7.1  
 License: GPL v2 or later  
 Tags: block, gatherpress, events, statistics  
