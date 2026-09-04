@@ -83,9 +83,45 @@ class Statistics {
 
 		/* @phpstan-ignore-next-line */
 		$result = is_numeric( $result ) ? absint( $result ) : 0;
-		
+
+		/**
+		 * Filters a calculated statistic value before it's cached.
+		 *
+		 * The hook name is dynamic - one filter per statistic type:
+		 *
+		 * - `gatherpress_stats_calculate_total_events`
+		 * - `gatherpress_stats_calculate_events_per_taxonomy`
+		 * - `gatherpress_stats_calculate_events_multi_taxonomy`
+		 * - `gatherpress_stats_calculate_total_taxonomy_terms`
+		 * - `gatherpress_stats_calculate_taxonomy_terms_by_taxonomy`
+		 * - `gatherpress_stats_calculate_total_attendees`
+		 *
+		 * @since 0.1.0
+		 *
+		 * @param int                  $result  The calculated statistic value.
+		 * @param array<string, mixed> $filters The filters applied to this statistic.
+		 *
+		 * @example
+		 * ```php
+		 * // Round counts over 50 to the nearest 10.
+		 * add_filter( 'gatherpress_stats_calculate_total_events', function ( int $count, array $filters ): int {
+		 *     return $count > 50 ? (int) round( $count / 10 ) * 10 : $count;
+		 * }, 10, 2 );
+		 * ```
+		 *
+		 * @example
+		 * ```php
+		 * // Apply a 1.5x multiplier to all event counts.
+		 * add_filter( 'gatherpress_stats_calculate_total_events', function ( int $count, array $filters ): int {
+		 *     return (int) round( $count * 1.5 );
+		 * }, 10, 2 );
+		 * ```
+		 */
 		$return = apply_filters( 'gatherpress_stats_calculate_' . $statistic_type, $result, $filters );
 
+		// A misbehaving callback could still return something that doesn't
+		// match the documented type, so keep this defensive at runtime.
+		// @phpstan-ignore-next-line
 		return is_numeric( $return ) ? absint( $return ) : $result;
 	}
 }

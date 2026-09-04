@@ -1,0 +1,13 @@
+{
+	"namespace": "GatherPressStatistics",
+	"base_dir": ".",
+	"wiki_directory": "docs/developer/hooks",
+	"github_blob_url": "https://github.com/carstingaxion/gatherpress-statistics/blob/main/",
+	"exclude_dirs": [
+		"vendor",
+		"tests",
+		"wp-content",
+    "build"
+	],
+	"github_wiki": false
+}
