@@ -8,7 +8,9 @@
 namespace GatherPressStatistics;
 
 use GatherPress\Core;
+use WP_Post;
 use WP_Query;
+use WP_Term;
 
 // Exit if accessed directly.
 defined( 'ABSPATH' ) || exit; // @codeCoverageIgnore
@@ -66,15 +68,47 @@ class Query {
 	 * When a post has more than one term in the taxonomy, the first one
 	 * returned by `wp_get_post_terms()` is used.
 	 *
+	 * Also understands GatherPress's `gatherpress-shadow-source` primitive
+	 * (used by post types like `gatherpress_venue` or `gatherpress_play`):
+	 * on the shadow-source post type's own singular, the post has no terms
+	 * "assigned" to itself in its own shadow taxonomy, so its self term is
+	 * resolved by slug instead. On the shadow taxonomy's own term archive,
+	 * $context_term already IS the term to use.
+	 *
 	 * @since 0.1.0
 	 *
-	 * @param int    $post_id  Context post id (0 when there is no context).
-	 * @param string $taxonomy Taxonomy slug to look up on the post.
-	 * @return int Term id, or 0 when the post has no term in that taxonomy.
+	 * @param int      $post_id      Context post id (0 when there is no context).
+	 * @param string   $taxonomy     Taxonomy slug to look up on the post.
+	 * @param WP_Term|null $context_term Optional. The queried term when the current
+	 *                                   request is a taxonomy archive.
+	 * @return int Term id, or 0 when nothing could be resolved.
 	 */
-	public function resolve_context_term( int $post_id, string $taxonomy ): int {
-		if ( $post_id <= 0 || empty( $taxonomy ) || ! taxonomy_exists( $taxonomy ) ) {
+	public function resolve_context_term( int $post_id, string $taxonomy, ?WP_Term $context_term = null ): int {
+		if ( empty( $taxonomy ) || ! taxonomy_exists( $taxonomy ) ) {
 			return 0;
+		}
+
+		// Archive of this exact taxonomy (e.g. a shadow taxonomy's own term
+		// archive): the queried term already is the context term.
+		if ( $context_term instanceof WP_Term && $context_term->taxonomy === $taxonomy ) {
+			return absint( $context_term->term_id );
+		}
+
+		if ( $post_id <= 0 ) {
+			return 0;
+		}
+
+		// gatherpress-shadow-source compatibility: on the shadow-source post
+		// type's own singular (e.g. a gatherpress_venue post), resolve its own
+		// self term rather than looking for terms assigned to it.
+		$shadow_source_post_type = $this->get_shadow_source_post_type_for_taxonomy( $taxonomy );
+
+		if ( '' !== $shadow_source_post_type && $shadow_source_post_type === get_post_type( $post_id ) ) {
+			$shadow_term_id = $this->resolve_own_shadow_term( $post_id, $taxonomy );
+
+			if ( $shadow_term_id > 0 ) {
+				return $shadow_term_id;
+			}
 		}
 
 		$terms = wp_get_post_terms( $post_id, sanitize_key( $taxonomy ), array( 'fields' => 'ids' ) );
@@ -84,6 +118,59 @@ class Query {
 		}
 
 		return absint( reset( $terms ) );
+	}
+
+	/**
+	 * Find the gatherpress-shadow-source post type that owns $taxonomy as its
+	 * shadow taxonomy, if any.
+	 *
+	 * Gracefully returns '' when the installed GatherPress core version
+	 * doesn't have the `gatherpress-shadow-source` primitive yet (it was
+	 * introduced in GatherPress 0.34.0), so this stays a no-op compatibility
+	 * layer rather than a hard dependency.
+	 *
+	 * @since 0.1.0
+	 *
+	 * @param string $taxonomy Taxonomy slug to check.
+	 * @return string Post type slug, or '' when $taxonomy isn't a recognized
+	 *                shadow taxonomy.
+	 */
+	private function get_shadow_source_post_type_for_taxonomy( string $taxonomy ): string {
+		if ( ! class_exists( '\GatherPress\Core\Shadow_Source' ) || ! function_exists( 'get_post_types_by_support' ) ) {
+			return '';
+		}
+
+		$shadow_source = Core\Shadow_Source::get_instance();
+
+		foreach ( get_post_types_by_support( 'gatherpress-shadow-source' ) as $post_type ) {
+			if ( $shadow_source->get_taxonomy( $post_type ) === $taxonomy ) {
+				return $post_type;
+			}
+		}
+
+		return '';
+	}
+
+	/**
+	 * Resolve a shadow-source post's own term in its own shadow taxonomy.
+	 *
+	 * @since 0.1.0
+	 *
+	 * @param int    $post_id  The shadow-source post id (e.g. a gatherpress_venue post).
+	 * @param string $taxonomy The post's own shadow taxonomy slug.
+	 * @return int Term id, or 0 when not found.
+	 */
+	private function resolve_own_shadow_term( int $post_id, string $taxonomy ): int {
+		$post = get_post( $post_id );
+
+		if ( ! $post instanceof WP_Post || empty( $post->post_name ) ) {
+			return 0;
+		}
+
+		$shadow_source = Core\Shadow_Source::get_instance();
+		$term          = get_term_by( 'slug', $shadow_source->term_slug_from_post_name( $post->post_name ), $taxonomy );
+
+		return $term instanceof WP_Term ? absint( $term->term_id ) : 0;
 	}
 
 	/**

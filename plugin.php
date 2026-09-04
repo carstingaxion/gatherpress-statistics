@@ -137,20 +137,22 @@ function gatherpress_statistics_get_cached( string $statistic_type, array $filte
 /**
  * Resolve a context term id - convenience wrapper.
  *
- * @since 0.1.0
+ * @since 0.2.0
  *
- * @param int    $post_id  Context post id.
- * @param string $taxonomy Taxonomy slug to look up on the post.
+ * @param int        $post_id      Context post id.
+ * @param string     $taxonomy     Taxonomy slug to look up on the post.
+ * @param \WP_Term|null $context_term Optional. The queried term when the current
+ *                                     request is a taxonomy archive.
  * @return int Resolved term id, or 0 when none found.
  */
-function gatherpress_statistics_resolve_context_term( int $post_id, string $taxonomy ): int {
-	return GatherPressStatistics\Query::get_instance()->resolve_context_term( $post_id, $taxonomy );
+function gatherpress_statistics_resolve_context_term( int $post_id, string $taxonomy, ?\WP_Term $context_term = null ): int {
+	return GatherPressStatistics\Query::get_instance()->resolve_context_term( $post_id, $taxonomy, $context_term );
 }
 
 /**
  * Resolve the effective context post id - convenience wrapper.
  *
- * @since 0.1.0
+ * @since 0.2.0
  *
  * @param int $post_id Context post id as originally resolved from block context
  *                      or the queried object.

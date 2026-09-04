@@ -39,11 +39,23 @@ $show_label     = isset( $attributes['showLabel'] ) ? $attributes['showLabel'] :
 $use_context_term   = isset( $attributes['useContextTerm'] ) ? (bool) $attributes['useContextTerm'] : false;
 $context_taxonomies = isset( $attributes['contextTaxonomies'] ) ? $attributes['contextTaxonomies'] : array();
 
+// The block's own postId context (templates, Query Loops) always wins. As
+// a fallback, ask WordPress what's actually being viewed: a post on
+// singular views, or - on a taxonomy archive, e.g. a gatherpress-shadow-
+// source taxonomy's own archive - a term.
 $context_post_id = 0;
+$context_term    = null;
+
 if ( isset( $block ) && $block instanceof WP_Block && ! empty( $block->context['postId'] ) && is_numeric( $block->context['postId'] ) ) {
 	$context_post_id = absint( $block->context['postId'] );
 } else {
-	$context_post_id = absint( get_queried_object_id() );
+	$queried_object = get_queried_object();
+
+	if ( $queried_object instanceof WP_Post ) {
+		$context_post_id = absint( $queried_object->ID );
+	} elseif ( $queried_object instanceof WP_Term ) {
+		$context_term = $queried_object;
+	}
 }
 
 // Let other code redirect context resolution to a different post (e.g. a
@@ -56,7 +68,7 @@ if ( $context_post_id > 0 ) {
 // Single-taxonomy path: swap the manually selected term for the one found
 // on the context post, for whichever taxonomy this statistic type actually
 // filters by.
-if ( $use_context_term && $context_post_id > 0 ) {
+if ( $use_context_term && ( $context_post_id > 0 || null !== $context_term ) ) {
 	$context_taxonomy = '';
 
 	if ( 'taxonomy_terms_by_taxonomy' === $statistic_type && ! empty( $attributes['filterTaxonomy'] ) ) {
@@ -66,7 +78,7 @@ if ( $use_context_term && $context_post_id > 0 ) {
 	}
 
 	if ( ! empty( $context_taxonomy ) ) {
-		$resolved_term = gatherpress_statistics_resolve_context_term( $context_post_id, $context_taxonomy );
+		$resolved_term = gatherpress_statistics_resolve_context_term( $context_post_id, $context_taxonomy, $context_term );
 		if ( $resolved_term > 0 ) {
 			$selected_term = $resolved_term;
 		} else {
@@ -132,14 +144,15 @@ if ( 'events_multi_taxonomy' === $statistic_type ) {
 	}
 
 	// Any taxonomy listed in contextTaxonomies gets its term resolved from
-	// the context post instead of (or in addition to) a manual selection.
-	if ( $context_post_id > 0 ) {
+	// the context post (or, on a taxonomy archive, the context term)
+	// instead of (or in addition to) a manual selection.
+	if ( $context_post_id > 0 || null !== $context_term ) {
 		foreach ( $context_taxonomies as $context_taxonomy_slug ) {
 			if ( empty( $context_taxonomy_slug ) ) {
 				continue;
 			}
 
-			$resolved_term = gatherpress_statistics_resolve_context_term( $context_post_id, $context_taxonomy_slug );
+			$resolved_term = gatherpress_statistics_resolve_context_term( $context_post_id, $context_taxonomy_slug, $context_term );
 
 			if ( $resolved_term > 0 ) {
 				$taxonomy_terms[ $context_taxonomy_slug ] = array( $resolved_term );
