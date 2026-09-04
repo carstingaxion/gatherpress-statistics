@@ -27,6 +27,7 @@
         "source": "https://github.com/figuren-theater/gatherpress-statistics"
     },
     "require-dev": {
+        "akirk/extract-wp-hooks": "^1.4",
         "figuren-theater/code-quality": "*",
         "wpackagist-plugin/gatherpress": "^0.35.2"
     },
@@ -34,6 +35,10 @@
         {
             "type": "composer",
             "url": "https://wpackagist.org"
+        },
+        {
+            "type": "vcs",
+            "url": "git@github.com:akirk/extract-wp-hooks.git"
         }
     ],
     "config": {
