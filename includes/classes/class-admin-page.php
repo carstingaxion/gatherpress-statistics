@@ -123,8 +123,8 @@ class Admin_Page {
 			return;
 		}
 
-		if ( ! isset( $_POST['gatherpress_archive_nonce'] ) || ! is_string( $_POST['gatherpress_archive_nonce'] ) || 
-			! wp_verify_nonce( $_POST['gatherpress_archive_nonce'], 'gatherpress_generate_archive' ) ) {
+		$nonce = isset( $_POST['gatherpress_archive_nonce'] ) ? sanitize_text_field( wp_unslash( $_POST['gatherpress_archive_nonce'] ) ) : '';
+		if ( ! $nonce || ! is_string( $nonce ) || ! wp_verify_nonce( $nonce, 'gatherpress_generate_archive' ) ) {
 			return;
 		}
 
@@ -263,8 +263,16 @@ class Admin_Page {
 		}
 
 		$labels = array(
-			'total_events'               => sprintf( __( 'Total %s', 'gatherpress-statistics' ), $plural_label ),
-			'events_multi_taxonomy'      => sprintf( __( '%s (Multiple Taxonomies)', 'gatherpress-statistics' ), $plural_label ),
+			'total_events'               => sprintf(
+				/* translators: %s: plural post type label, e.g. "Events". */
+				__( 'Total %s', 'gatherpress-statistics' ),
+				$plural_label
+			),
+			'events_multi_taxonomy'      => sprintf(
+				/* translators: %s: plural post type label, e.g. "Events". */
+				__( '%s (Multiple Taxonomies)', 'gatherpress-statistics' ),
+				$plural_label
+			),
 			'total_taxonomy_terms'       => __( 'Total Taxonomy Terms', 'gatherpress-statistics' ),
 			'taxonomy_terms_by_taxonomy' => __( 'Taxonomy Terms by Taxonomy', 'gatherpress-statistics' ),
 			'total_attendees'            => __( 'Total Attendees', 'gatherpress-statistics' ),
@@ -409,10 +417,14 @@ class Admin_Page {
 		
 		$current_tab_key = null !== $current_tab ? $current_tab['key'] : '';
 		
-		$years = $wpdb->get_col( "SELECT DISTINCT statistic_year FROM {$table_name} ORDER BY statistic_year DESC" );
+		$years = $wpdb->get_col(
+			$wpdb->prepare( 'SELECT DISTINCT statistic_year FROM %i ORDER BY statistic_year DESC', $table_name )
+		);
 		
 		$taxonomies  = array();
-		$all_filters = $wpdb->get_col( "SELECT DISTINCT filters_data FROM {$table_name}" );
+		$all_filters = $wpdb->get_col(
+			$wpdb->prepare( 'SELECT DISTINCT filters_data FROM %i', $table_name )
+		);
 		foreach ( $all_filters as $filters_json ) {
 			$filters = json_decode( $filters_json, true );
 			if ( isset( $filters['taxonomy'] ) && ! in_array( $filters['taxonomy'], $taxonomies, true ) ) {
