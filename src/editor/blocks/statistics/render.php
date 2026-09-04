@@ -46,6 +46,13 @@ if ( isset( $block ) && $block instanceof WP_Block && ! empty( $block->context['
 	$context_post_id = absint( get_queried_object_id() );
 }
 
+// Let other code redirect context resolution to a different post (e.g. a
+// parent post for a sub-post-type template) via the
+// `gatherpress_statistics_context_post` filter.
+if ( $context_post_id > 0 ) {
+	$context_post_id = gatherpress_statistics_resolve_context_post( $context_post_id );
+}
+
 // Single-taxonomy path: swap the manually selected term for the one found
 // on the context post, for whichever taxonomy this statistic type actually
 // filters by.

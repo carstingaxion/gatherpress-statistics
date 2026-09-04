@@ -148,6 +148,19 @@ function gatherpress_statistics_resolve_context_term( int $post_id, string $taxo
 }
 
 /**
+ * Resolve the effective context post id - convenience wrapper.
+ *
+ * @since 0.1.0
+ *
+ * @param int $post_id Context post id as originally resolved from block context
+ *                      or the queried object.
+ * @return int The (possibly filtered) context post id.
+ */
+function gatherpress_statistics_resolve_context_post( int $post_id ): int {
+	return GatherPressStatistics\Query::get_instance()->resolve_context_post( $post_id );
+}
+
+/**
  * Clear cache - convenience wrapper.
  *
  * @since 0.1.0

@@ -87,6 +87,79 @@ class Query {
 	}
 
 	/**
+	 * Resolve the effective context post id via a public filter.
+	 *
+	 * Lets other code redirect statistics context resolution to a different
+	 * post than the one that was actually queried. This is for post types
+	 * whose singular template renders in the context of another "parent"
+	 * post - for example a `gatherpress_play_sub` post that belongs to a
+	 * parent `gatherpress_play` - so that post type can hook into the filter
+	 * and point resolution at its parent automatically, without requiring
+	 * per-block configuration.
+	 *
+	 * @since 0.2.0
+	 *
+	 * @param int $post_id Context post id as originally resolved from block
+	 *                      context or the queried object (0 when there is no context).
+	 * @return int The (possibly filtered) context post id.
+	 */
+	public function resolve_context_post( int $post_id ): int {
+		if ( $post_id <= 0 ) {
+			return 0;
+		}
+
+		$post_type = (string) get_post_type( $post_id );
+
+		/**
+		 * Filters the context post used to resolve context-derived taxonomy
+		 * terms for the GatherPress Statistics block.
+		 * 
+		 * The Statistics block resolves its "context post" (used to derive
+		 * context-driven taxonomy terms) from the block's postId context or the
+		 * queried object. That's the right post on a Single Event/Venue
+		 * template, but wrong for a post type whose singular template renders
+		 * in the context of a different "parent" post — for example a
+		 * gatherpress_play_sub belonging to a parent gatherpress_play — where
+		 * the statistics should really be about the parent.
+		 *
+		 * @example Use parent_post as context
+		 * ```php
+		 * add_filter( 'gatherpress_statistics_context_post', function ( $context, $post_id, $post_type ) {
+		 *     if ( 'gatherpress_play_sub' === $post_type ) {
+		 *         $parent_id = wp_get_post_parent_id( $post_id );
+		 *         if ( $parent_id ) {
+		 *             $context['post_id']   = $parent_id;
+		 *             $context['post_type'] = get_post_type( $parent_id );
+		 *         }
+		 *     }
+		 *     return $context;
+		 * }, 10, 3 );
+		 * ```
+		 *
+		 * @since 0.2.0
+		 *
+		 * @param array{post_id: int, post_type: string} $context   The context post's id and post type.
+		 * @param int                                     $post_id   The original (unfiltered) context post id.
+		 * @param string                                  $post_type The original (unfiltered) context post's post type.
+		 */
+		$context = apply_filters(
+			'gatherpress_statistics_context_post',
+			array(
+				'post_id'   => $post_id,
+				'post_type' => $post_type,
+			),
+			$post_id,
+			$post_type
+		);
+
+		// A misbehaving callback could still return something that doesn't
+		// match the documented shape, so keep this defensive at runtime even
+		// though the shape is statically known from the hook's own docblock.
+		// @phpstan-ignore-next-line booleanAnd.alwaysTrue, ternary.alwaysTrue
+		return ( is_array( $context ) && isset( $context['post_id'] ) && is_numeric( $context['post_id'] ) ) ? absint( $context['post_id'] ) : $post_id;
+	}
+
+	/**
 	 * Count events with filters.
 	 *
 	 * @since 0.1.0
