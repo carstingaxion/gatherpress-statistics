@@ -8,6 +8,7 @@
 namespace GatherPressStatistics;
 
 use GatherPress\Core;
+use WP_Post;
 
 // Exit if accessed directly.
 defined( 'ABSPATH' ) || exit; // @codeCoverageIgnore
@@ -45,7 +46,7 @@ class Cache_Invalidation {
 		add_action( 'create_term', array( $this, 'clear_cache_on_term_change' ), 10, 3 );
 		add_action( 'edit_term', array( $this, 'clear_cache_on_term_change' ), 10, 3 );
 		add_action( 'delete_term', array( $this, 'clear_cache_on_term_change' ), 10, 3 );
-		add_action( 'set_object_terms', array( $this, 'clear_cache_on_term_relationship' ), 10, 3 );
+		add_action( 'set_object_terms', array( $this, 'clear_cache_on_term_relationship' ) );
 	}
 
 	/**
@@ -53,16 +54,12 @@ class Cache_Invalidation {
 	 *
 	 * @since 0.1.0
 	 *
-	 * @param string   $new_status New post status.
-	 * @param string   $old_status Old post status.
-	 * @param \WP_Post $post       Post object.
+	 * @param string  $new_status New post status.
+	 * @param string  $old_status Old post status.
+	 * @param WP_Post $post       Post object.
 	 * @return void
 	 */
-	public function clear_cache_on_status_change( string $new_status, string $old_status, $post ): void {
-		if ( ! is_object( $post ) || ! isset( $post->post_type ) ) {
-			return;
-		}
-		
+	public function clear_cache_on_status_change( string $new_status, string $old_status, WP_Post $post ): void {
 		if ( ! post_type_supports( $post->post_type, 'gatherpress_statistics' ) ) {
 			return;
 		}
@@ -123,15 +120,13 @@ class Cache_Invalidation {
 		
 		$supported_taxonomies = Taxonomy::get_instance()->get_filtered_taxonomies();
 
-		if ( empty( $supported_taxonomies ) || ! is_array( $supported_taxonomies ) ) {
+		if ( empty( $supported_taxonomies ) ) {
 			return;
 		}
 
 		$taxonomy_slugs = array();
 		foreach ( $supported_taxonomies as $tax_obj ) {
-			if ( isset( $tax_obj->name ) ) {
-				$taxonomy_slugs[] = $tax_obj->name;
-			}
+			$taxonomy_slugs[] = $tax_obj->name;
 		}
 
 		if ( in_array( $taxonomy, $taxonomy_slugs, true ) ) {
@@ -144,12 +139,10 @@ class Cache_Invalidation {
 	 *
 	 * @since 0.1.0
 	 *
-	 * @param int             $object_id Object ID.
-	 * @param array<int, int> $terms     Term IDs.
-	 * @param array<int, int> $tt_ids    Term taxonomy IDs.
+	 * @param int $object_id Object ID.
 	 * @return void
 	 */
-	public function clear_cache_on_term_relationship( int $object_id, array $terms, array $tt_ids ): void {
+	public function clear_cache_on_term_relationship( int $object_id ): void {
 		if ( Support::get_instance()->is_supported_post( $object_id ) ) {
 			Cache::get_instance()->clear_cache();
 		}

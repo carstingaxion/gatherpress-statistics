@@ -15,6 +15,8 @@
  *   selectedTaxonomyTerms?: array<string, mixed>,
  *   countTaxonomy?: string,
  *   filterTaxonomy?: string,
+ *   useContextTerm?: bool,
+ *   contextTaxonomies?: array<int, string>,
  *   eventQuery?: string,
  *   showLabel?: bool,
  *   prefixDefault?: string,
@@ -30,6 +32,61 @@ $label_plural   = isset( $attributes['labelPlural'] ) ? $attributes['labelPlural
 $selected_term  = isset( $attributes['selectedTerm'] ) ? intval( $attributes['selectedTerm'] ) : 0;
 $event_query    = isset( $attributes['eventQuery'] ) ? $attributes['eventQuery'] : 'past';
 $show_label     = isset( $attributes['showLabel'] ) ? $attributes['showLabel'] : true;
+
+// Context-awareness: derive term(s) from the post this block is placed on
+// (a Single Event/Venue template, or the current Query Loop item) instead
+// of a manually picked term.
+$use_context_term   = isset( $attributes['useContextTerm'] ) ? (bool) $attributes['useContextTerm'] : false;
+$context_taxonomies = isset( $attributes['contextTaxonomies'] ) ? $attributes['contextTaxonomies'] : array();
+
+// The block's own postId context (templates, Query Loops) always wins. As
+// a fallback, ask WordPress what's actually being viewed: a post on
+// singular views, or - on a taxonomy archive, e.g. a gatherpress-shadow-
+// source taxonomy's own archive - a term.
+$context_post_id = 0;
+$context_term    = null;
+
+if ( isset( $block ) && $block instanceof WP_Block && ! empty( $block->context['postId'] ) && is_numeric( $block->context['postId'] ) ) {
+	$context_post_id = absint( $block->context['postId'] );
+} else {
+	$queried_object = get_queried_object();
+
+	if ( $queried_object instanceof WP_Post ) {
+		$context_post_id = absint( $queried_object->ID );
+	} elseif ( $queried_object instanceof WP_Term ) {
+		$context_term = $queried_object;
+	}
+}
+
+// Let other code redirect context resolution to a different post (e.g. a
+// parent post for a sub-post-type template) via the
+// `gatherpress_statistics_context_post` filter.
+if ( $context_post_id > 0 ) {
+	$context_post_id = gatherpress_statistics_resolve_context_post( $context_post_id );
+}
+
+// Single-taxonomy path: swap the manually selected term for the one found
+// on the context post, for whichever taxonomy this statistic type actually
+// filters by.
+if ( $use_context_term && ( $context_post_id > 0 || null !== $context_term ) ) {
+	$context_taxonomy = '';
+
+	if ( 'taxonomy_terms_by_taxonomy' === $statistic_type && ! empty( $attributes['filterTaxonomy'] ) ) {
+		$context_taxonomy = $attributes['filterTaxonomy'];
+	} elseif ( ! empty( $attributes['selectedTaxonomy'] ) ) {
+		$context_taxonomy = $attributes['selectedTaxonomy'];
+	}
+
+	if ( ! empty( $context_taxonomy ) ) {
+		$resolved_term = gatherpress_statistics_resolve_context_term( $context_post_id, $context_taxonomy, $context_term );
+		if ( $resolved_term > 0 ) {
+			$selected_term = $resolved_term;
+		} else {
+			// No term found on the context post for this taxonomy: nothing to filter by.
+			$selected_term = 0;
+		}
+	}
+}
 
 // Prefix and suffix settings
 $prefix_default        = isset( $attributes['prefixDefault'] ) ? $attributes['prefixDefault'] : '';
@@ -85,6 +142,26 @@ if ( 'events_multi_taxonomy' === $statistic_type ) {
 			}
 		}
 	}
+
+	// Any taxonomy listed in contextTaxonomies gets its term resolved from
+	// the context post (or, on a taxonomy archive, the context term)
+	// instead of (or in addition to) a manual selection.
+	if ( $context_post_id > 0 || null !== $context_term ) {
+		foreach ( $context_taxonomies as $context_taxonomy_slug ) {
+			if ( empty( $context_taxonomy_slug ) ) {
+				continue;
+			}
+
+			$resolved_term = gatherpress_statistics_resolve_context_term( $context_post_id, $context_taxonomy_slug, $context_term );
+
+			if ( $resolved_term > 0 ) {
+				$taxonomy_terms[ $context_taxonomy_slug ] = array( $resolved_term );
+			} else {
+				// No term found on the context post: don't filter by this taxonomy.
+				unset( $taxonomy_terms[ $context_taxonomy_slug ] );
+			}
+		}
+	}
 	
 	if ( ! empty( $taxonomy_terms ) ) {
 		$filters['taxonomy_terms'] = $taxonomy_terms;
@@ -95,7 +172,7 @@ if ( 'events_multi_taxonomy' === $statistic_type ) {
 $count = gatherpress_statistics_get_cached( $statistic_type, $filters );
 
 // Don't display if count is 0.
-if ( $count === 0 || ! is_int( $count ) ) {
+if ( $count === 0 ) {
 	return;
 }
 

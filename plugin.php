@@ -94,9 +94,14 @@ register_activation_hook( __FILE__, 'gatherpress_statistics_activate_plugin' );
  * @return void
  */
 function gatherpress_statistics_deactivate_plugin(): void {
+	/**
+	 * Help phpstan understand $wpdb is global.
+	 * 
+	 * @var \wpdb  $wpdb WordPress database abstraction object.
+	 */
 	global $wpdb;
 	
-	$wpdb->query(
+	$wpdb->query( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 		"DELETE FROM {$wpdb->options} 
 		WHERE option_name LIKE '_transient_gatherpress_stats_%' 
 		OR option_name LIKE '_transient_timeout_gatherpress_stats_%'"
@@ -127,6 +132,34 @@ register_deactivation_hook( __FILE__, 'gatherpress_statistics_deactivate_plugin'
  */
 function gatherpress_statistics_get_cached( string $statistic_type, array $filters = array() ): int {
 	return GatherPressStatistics\Cache::get_instance()->get_cached( $statistic_type, $filters );
+}
+
+/**
+ * Resolve a context term id - convenience wrapper.
+ *
+ * @since 0.2.0
+ *
+ * @param int        $post_id      Context post id.
+ * @param string     $taxonomy     Taxonomy slug to look up on the post.
+ * @param \WP_Term|null $context_term Optional. The queried term when the current
+ *                                     request is a taxonomy archive.
+ * @return int Resolved term id, or 0 when none found.
+ */
+function gatherpress_statistics_resolve_context_term( int $post_id, string $taxonomy, ?\WP_Term $context_term = null ): int {
+	return GatherPressStatistics\Query::get_instance()->resolve_context_term( $post_id, $taxonomy, $context_term );
+}
+
+/**
+ * Resolve the effective context post id - convenience wrapper.
+ *
+ * @since 0.2.0
+ *
+ * @param int $post_id Context post id as originally resolved from block context
+ *                      or the queried object.
+ * @return int The (possibly filtered) context post id.
+ */
+function gatherpress_statistics_resolve_context_post( int $post_id ): int {
+	return GatherPressStatistics\Query::get_instance()->resolve_context_post( $post_id );
 }
 
 /**

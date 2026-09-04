@@ -49,8 +49,8 @@ class Archive {
 	 * @return void
 	 */
 	public function archive_monthly_statistics(): void {
-		$current_year  = (int) date( 'Y' );
-		$current_month = (int) date( 'n' );
+		$current_year  = (int) gmdate( 'Y' );
+		$current_month = (int) gmdate( 'n' );
 		
 		$this->archive_statistics_for_month( $current_year, $current_month );
 	}
@@ -66,9 +66,14 @@ class Archive {
 	 * @return bool True on success, false on failure.
 	 */
 	public function archive_statistics_for_month( int $year, int $month ): bool {
+		/**
+		 * Help phpstan understand $wpdb is global.
+		 * 
+		 * @var \wpdb  $wpdb WordPress database abstraction object.
+		 */
 		global $wpdb;
 		
-		$table_name   = $wpdb->prefix . 'gatherpress_statistics_archive';
+		$table_name   = sprintf( Database::TABLE_FORMAT, $wpdb->prefix );
 		$current_time = current_time( 'mysql' );
 		
 		$configs = Cache::get_instance()->get_common_configs();
@@ -82,10 +87,6 @@ class Archive {
 		$post_type     = ! empty( $post_types ) ? $post_types[0] : 'gatherpress_event';
 		
 		foreach ( $configs as $config ) {
-			if ( ! isset( $config['type'] ) || ! isset( $config['filters'] ) ) {
-				continue;
-			}
-			
 			$config['filters']['event_query'] = 'past';
 			
 			$filters_with_date = array_merge(
@@ -97,16 +98,17 @@ class Archive {
 			);
 			
 			$value        = Statistics::get_instance()->calculate( $config['type'], $filters_with_date );
-			$filters_hash = md5( wp_json_encode( $config['filters'] ) );
+			$filters_hash = md5( (string) wp_json_encode( $config['filters'] ) );
 			
-			$exists = $wpdb->get_var(
+			$exists = $wpdb->get_var( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 				$wpdb->prepare(
-					"SELECT id FROM {$table_name} 
+					'SELECT id FROM %i
 					 WHERE post_type = %s
 					 AND statistic_type = %s 
 					 AND statistic_year = %d 
 					 AND statistic_month = %d 
-					 AND filters_hash = %s",
+					 AND filters_hash = %s',
+					$table_name,
 					$post_type,
 					$config['type'],
 					$year,
@@ -116,7 +118,7 @@ class Archive {
 			);
 
 			if ( $exists ) {
-				$result = $wpdb->update(
+				$result = $wpdb->update( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 					$table_name,
 					array(
 						'statistic_value' => $value,
@@ -127,7 +129,7 @@ class Archive {
 					array( '%d' )
 				);
 			} else {
-				$result = $wpdb->insert(
+				$result = $wpdb->insert( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
 					$table_name,
 					array(
 						'post_type'       => $post_type,
@@ -135,7 +137,7 @@ class Archive {
 						'statistic_year'  => $year,
 						'statistic_month' => $month,
 						'filters_hash'    => $filters_hash,
-						'filters_data'    => wp_json_encode( $config['filters'] ),
+						'filters_data'    => (string) wp_json_encode( $config['filters'] ),
 						'statistic_value' => $value,
 						'archived_at'     => $current_time,
 					),

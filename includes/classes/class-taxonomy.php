@@ -51,11 +51,9 @@ class Taxonomy {
 			
 			$taxonomies = \get_object_taxonomies( $post_type, 'objects' );
 			
-			if ( ! empty( $taxonomies ) && is_array( $taxonomies ) ) {
+			if ( ! empty( $taxonomies ) ) {
 				foreach ( $taxonomies as $taxonomy ) {
-					if ( isset( $taxonomy->name ) ) {
-						$all_taxonomies[ $taxonomy->name ] = $taxonomy;
-					}
+					$all_taxonomies[ $taxonomy->name ] = $taxonomy;
 				}
 			}
 		}
@@ -74,13 +72,12 @@ class Taxonomy {
 	public function get_filtered_taxonomies( bool $for_editor = false ): array {
 		$taxonomies = $this->get_taxonomies();
 		
-		if ( empty( $taxonomies ) || ! is_array( $taxonomies ) ) {
+		if ( empty( $taxonomies ) ) {
 			return array();
 		}
 		
 		$excluded_taxonomies = apply_filters(
 			'gatherpress_statistics_excluded_taxonomies',
-			// array( '_gatherpress_venue' ),
 			array(),
 			$for_editor
 		);
@@ -91,10 +88,6 @@ class Taxonomy {
 		
 		$filtered_taxonomies = array();
 		foreach ( $taxonomies as $taxonomy ) {
-			if ( ! isset( $taxonomy->name ) ) {
-				continue;
-			}
-			
 			if ( in_array( $taxonomy->name, $excluded_taxonomies, true ) ) {
 				continue;
 			}

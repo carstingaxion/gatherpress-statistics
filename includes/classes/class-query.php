@@ -8,6 +8,9 @@
 namespace GatherPressStatistics;
 
 use GatherPress\Core;
+use WP_Post;
+use WP_Query;
+use WP_Term;
 
 // Exit if accessed directly.
 defined( 'ABSPATH' ) || exit; // @codeCoverageIgnore
@@ -39,14 +42,14 @@ class Query {
 	private function build_date_query( array $filters ): array {
 		$date_query = array();
 		
-		if ( ! empty( $filters['year'] ) ) {
+		if ( ! empty( $filters['year'] ) && is_string( $filters['year'] ) ) {
 			$year = absint( $filters['year'] );
 			if ( $year > 0 ) {
 				$date_query['year'] = $year;
 			}
 		}
 		
-		if ( ! empty( $filters['month'] ) ) {
+		if ( ! empty( $filters['month'] ) && is_string( $filters['month'] ) ) {
 			$month = absint( $filters['month'] );
 			if ( $month >= 1 && $month <= 12 ) {
 				$date_query['month'] = $month;
@@ -54,6 +57,193 @@ class Query {
 		}
 		
 		return $date_query;
+	}
+
+	/**
+	 * Resolve a taxonomy term id from a context post instead of a manual selection.
+	 *
+	 * Used when a block is configured to derive its filter term from the
+	 * post it is placed on (e.g. a Single Event template, or the current
+	 * item inside a Query Loop) rather than from a hard-coded term id.
+	 * When a post has more than one term in the taxonomy, the first one
+	 * returned by `wp_get_post_terms()` is used.
+	 *
+	 * Also understands GatherPress's `gatherpress-shadow-source` primitive
+	 * (used by post types like `gatherpress_venue` or `gatherpress_play`):
+	 * on the shadow-source post type's own singular, the post has no terms
+	 * "assigned" to itself in its own shadow taxonomy, so its self term is
+	 * resolved by slug instead. On the shadow taxonomy's own term archive,
+	 * $context_term already IS the term to use.
+	 *
+	 * @since 0.1.0
+	 *
+	 * @param int      $post_id      Context post id (0 when there is no context).
+	 * @param string   $taxonomy     Taxonomy slug to look up on the post.
+	 * @param WP_Term|null $context_term Optional. The queried term when the current
+	 *                                   request is a taxonomy archive.
+	 * @return int Term id, or 0 when nothing could be resolved.
+	 */
+	public function resolve_context_term( int $post_id, string $taxonomy, ?WP_Term $context_term = null ): int {
+		if ( empty( $taxonomy ) || ! taxonomy_exists( $taxonomy ) ) {
+			return 0;
+		}
+
+		// Archive of this exact taxonomy (e.g. a shadow taxonomy's own term
+		// archive): the queried term already is the context term.
+		if ( $context_term instanceof WP_Term && $context_term->taxonomy === $taxonomy ) {
+			return absint( $context_term->term_id );
+		}
+
+		if ( $post_id <= 0 ) {
+			return 0;
+		}
+
+		// gatherpress-shadow-source compatibility: on the shadow-source post
+		// type's own singular (e.g. a gatherpress_venue post), resolve its own
+		// self term rather than looking for terms assigned to it.
+		$shadow_source_post_type = $this->get_shadow_source_post_type_for_taxonomy( $taxonomy );
+
+		if ( '' !== $shadow_source_post_type && $shadow_source_post_type === get_post_type( $post_id ) ) {
+			$shadow_term_id = $this->resolve_own_shadow_term( $post_id, $taxonomy );
+
+			if ( $shadow_term_id > 0 ) {
+				return $shadow_term_id;
+			}
+		}
+
+		$terms = wp_get_post_terms( $post_id, sanitize_key( $taxonomy ), array( 'fields' => 'ids' ) );
+
+		if ( is_wp_error( $terms ) || empty( $terms ) ) {
+			return 0;
+		}
+
+		return absint( reset( $terms ) );
+	}
+
+	/**
+	 * Find the gatherpress-shadow-source post type that owns $taxonomy as its
+	 * shadow taxonomy, if any.
+	 *
+	 * Gracefully returns '' when the installed GatherPress core version
+	 * doesn't have the `gatherpress-shadow-source` primitive yet (it was
+	 * introduced in GatherPress 0.34.0), so this stays a no-op compatibility
+	 * layer rather than a hard dependency.
+	 *
+	 * @since 0.1.0
+	 *
+	 * @param string $taxonomy Taxonomy slug to check.
+	 * @return string Post type slug, or '' when $taxonomy isn't a recognized
+	 *                shadow taxonomy.
+	 */
+	private function get_shadow_source_post_type_for_taxonomy( string $taxonomy ): string {
+		if ( ! class_exists( '\GatherPress\Core\Shadow_Source' ) || ! function_exists( 'get_post_types_by_support' ) ) {
+			return '';
+		}
+
+		$shadow_source = Core\Shadow_Source::get_instance();
+
+		foreach ( get_post_types_by_support( 'gatherpress-shadow-source' ) as $post_type ) {
+			if ( $shadow_source->get_taxonomy( $post_type ) === $taxonomy ) {
+				return $post_type;
+			}
+		}
+
+		return '';
+	}
+
+	/**
+	 * Resolve a shadow-source post's own term in its own shadow taxonomy.
+	 *
+	 * @since 0.1.0
+	 *
+	 * @param int    $post_id  The shadow-source post id (e.g. a gatherpress_venue post).
+	 * @param string $taxonomy The post's own shadow taxonomy slug.
+	 * @return int Term id, or 0 when not found.
+	 */
+	private function resolve_own_shadow_term( int $post_id, string $taxonomy ): int {
+		$post = get_post( $post_id );
+
+		if ( ! $post instanceof WP_Post || empty( $post->post_name ) ) {
+			return 0;
+		}
+
+		$shadow_source = Core\Shadow_Source::get_instance();
+		$term          = get_term_by( 'slug', $shadow_source->term_slug_from_post_name( $post->post_name ), $taxonomy );
+
+		return $term instanceof WP_Term ? absint( $term->term_id ) : 0;
+	}
+
+	/**
+	 * Resolve the effective context post id via a public filter.
+	 *
+	 * Lets other code redirect statistics context resolution to a different
+	 * post than the one that was actually queried. This is for post types
+	 * whose singular template renders in the context of another "parent"
+	 * post - for example a `gatherpress_play_sub` post that belongs to a
+	 * parent `gatherpress_play` - so that post type can hook into the filter
+	 * and point resolution at its parent automatically, without requiring
+	 * per-block configuration.
+	 *
+	 * @since 0.2.0
+	 *
+	 * @param int $post_id Context post id as originally resolved from block
+	 *                      context or the queried object (0 when there is no context).
+	 * @return int The (possibly filtered) context post id.
+	 */
+	public function resolve_context_post( int $post_id ): int {
+		if ( $post_id <= 0 ) {
+			return 0;
+		}
+
+		$post_type = (string) get_post_type( $post_id );
+
+		/**
+		 * Filters the context post used to resolve context-derived taxonomy
+		 * terms for the GatherPress Statistics block.
+		 * 
+		 * The Statistics block resolves its "context post" (used to derive
+		 * context-driven taxonomy terms) from the block's postId context or the
+		 * queried object. That's the right post on a Single Event/Venue
+		 * template, but wrong for a post type whose singular template renders
+		 * in the context of a different "parent" post — for example a
+		 * gatherpress_play_sub belonging to a parent gatherpress_play — where
+		 * the statistics should really be about the parent.
+		 *
+		 * @example Use parent_post as context
+		 * ```php
+		 * add_filter( 'gatherpress_statistics_context_post', function ( $context, $post_id, $post_type ) {
+		 *     if ( 'gatherpress_play_sub' === $post_type ) {
+		 *         $parent_id = wp_get_post_parent_id( $post_id );
+		 *         if ( $parent_id ) {
+		 *             $context['post_id']   = $parent_id;
+		 *             $context['post_type'] = get_post_type( $parent_id );
+		 *         }
+		 *     }
+		 *     return $context;
+		 * }, 10, 3 );
+		 * ```
+		 *
+		 * @since 0.2.0
+		 *
+		 * @param array{post_id: int, post_type: string} $context   The context post's id and post type.
+		 * @param int                                     $post_id   The original (unfiltered) context post id.
+		 * @param string                                  $post_type The original (unfiltered) context post's post type.
+		 */
+		$context = apply_filters(
+			'gatherpress_statistics_context_post',
+			array(
+				'post_id'   => $post_id,
+				'post_type' => $post_type,
+			),
+			$post_id,
+			$post_type
+		);
+
+		// A misbehaving callback could still return something that doesn't
+		// match the documented shape, so keep this defensive at runtime even
+		// though the shape is statically known from the hook's own docblock.
+		// @phpstan-ignore-next-line booleanAnd.alwaysTrue, ternary.alwaysTrue
+		return ( is_array( $context ) && isset( $context['post_id'] ) && is_numeric( $context['post_id'] ) ) ? absint( $context['post_id'] ) : $post_id;
 	}
 
 	/**
@@ -70,8 +260,6 @@ class Query {
 		if ( empty( $post_types ) ) {
 			return 0;
 		}
-		
-		$filters = is_array( $filters ) ? $filters : array();
 		
 		$args = array(
 			'post_type'      => $post_types,
@@ -92,9 +280,9 @@ class Query {
 			$args['date_query'] = array( $date_query );
 		}
 		
-		if ( ! empty( $filters['taxonomy'] ) && ! empty( $filters['term_id'] ) ) {
+		if ( ! empty( $filters['taxonomy'] ) && is_string( $filters['taxonomy'] ) && ! empty( $filters['term_id'] ) && is_numeric( $filters['term_id'] ) ) {
 			if ( taxonomy_exists( $filters['taxonomy'] ) ) {
-				$args['tax_query'] = array(
+				$args['tax_query'] = array( // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_tax_query
 					array(
 						'taxonomy' => sanitize_key( $filters['taxonomy'] ),
 						'field'    => 'term_id',
@@ -110,17 +298,17 @@ class Query {
 					$tax_query[] = array(
 						'taxonomy' => sanitize_key( $taxonomy ),
 						'field'    => 'term_id',
-						'terms'    => array_map( 'absint', $term_ids ),
+						'terms'    => $term_ids,
 					);
 				}
 			}
 			
 			if ( count( $tax_query ) > 1 ) {
-				$args['tax_query'] = $tax_query;
+				$args['tax_query'] = $tax_query; // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_tax_query
 			}
 		}
 		
-		$query = new \WP_Query( $args );
+		$query = new WP_Query( $args );
 		
 		return absint( $query->found_posts );
 	}
@@ -140,7 +328,6 @@ class Query {
 			return 0;
 		}
 		
-		$filters  = is_array( $filters ) ? $filters : array();
 		$taxonomy = isset( $filters['taxonomy'] ) && is_string( $filters['taxonomy'] ) ? $filters['taxonomy'] : '';
 		
 		if ( empty( $taxonomy ) || ! taxonomy_exists( $taxonomy ) ) {
@@ -150,7 +337,7 @@ class Query {
 		$args = array(
 			'taxonomy'   => sanitize_key( $taxonomy ),
 			'hide_empty' => true,
-			'object_ids' => null,
+			'object_ids' => array(), // Will be filled with post IDs later.
 		);
 		
 		$query_args = array(
@@ -165,15 +352,22 @@ class Query {
 			$query_args['date_query'] = array( $date_query );
 		}
 		
-		$post_query = new \WP_Query( $query_args );
+		$post_query = new WP_Query( $query_args );
 		
 		if ( ! empty( $post_query->posts ) ) {
-			$args['object_ids'] = $post_query->posts;
+
+			/**
+			 * This is for sure an array of int, because of 'fields' => 'ids'.
+			 *
+			 * @var int[] $postids
+			 */
+			$postids            = $post_query->posts;
+			$args['object_ids'] = $postids;
 		}
 		
-		$terms = \get_terms( $args );
+		$terms = get_terms( $args );
 		
-		if ( is_wp_error( $terms ) || ! is_array( $terms ) ) {
+		if ( is_wp_error( $terms ) ) {
 			return 0;
 		}
 		
@@ -195,11 +389,9 @@ class Query {
 			return 0;
 		}
 		
-		$filters = is_array( $filters ) ? $filters : array();
-		
 		$count_taxonomy  = isset( $filters['count_taxonomy'] ) && is_string( $filters['count_taxonomy'] ) ? $filters['count_taxonomy'] : '';
 		$filter_taxonomy = isset( $filters['filter_taxonomy'] ) && is_string( $filters['filter_taxonomy'] ) ? $filters['filter_taxonomy'] : '';
-		$term_id         = isset( $filters['term_id'] ) ? absint( $filters['term_id'] ) : 0;
+		$term_id         = isset( $filters['term_id'] ) && is_numeric( $filters['term_id'] ) ? absint( $filters['term_id'] ) : 0;
 		
 		if ( empty( $count_taxonomy ) || empty( $filter_taxonomy ) || $term_id === 0 ) {
 			return 0;
@@ -214,7 +406,7 @@ class Query {
 			'post_status'    => 'publish',
 			'posts_per_page' => -1,
 			'fields'         => 'ids',
-			'tax_query'      => array(
+			'tax_query'      => array( // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_tax_query
 				array(
 					'taxonomy' => sanitize_key( $filter_taxonomy ),
 					'field'    => 'term_id',
@@ -228,14 +420,19 @@ class Query {
 			$args['date_query'] = array( $date_query );
 		}
 		
-		$query = new \WP_Query( $args );
+		$query = new WP_Query( $args );
 		$terms = array();
 		
-		if ( is_array( $query->posts ) ) {
+		if ( ! empty( $query->posts ) ) {
+			/**
+			 * This is for sure an int, because of 'fields' => 'ids'.
+			 *
+			 * @var int $post_id
+			 */
 			foreach ( $query->posts as $post_id ) {
 				$post_terms = wp_get_post_terms( $post_id, sanitize_key( $count_taxonomy ), array( 'fields' => 'ids' ) );
 				
-				if ( ! is_wp_error( $post_terms ) && is_array( $post_terms ) && ! empty( $post_terms ) ) {
+				if ( ! is_wp_error( $post_terms ) && ! empty( $post_terms ) ) {
 					$terms = array_merge( $terms, $post_terms );
 				}
 			}
@@ -258,8 +455,7 @@ class Query {
 		if ( empty( $post_types ) ) {
 			return 0;
 		}
-		$filters = is_array( $filters ) ? $filters : array();
-		
+
 		$args = array(
 			'post_type'      => $post_types,
 			'post_status'    => 'publish',
@@ -279,9 +475,9 @@ class Query {
 			$args['date_query'] = array( $date_query );
 		}
 		
-		if ( ! empty( $filters['taxonomy'] ) && ! empty( $filters['term_id'] ) ) {
+		if ( ! empty( $filters['taxonomy'] ) && is_string( $filters['taxonomy'] ) && ! empty( $filters['term_id'] ) && is_numeric( $filters['term_id'] ) ) {
 			if ( taxonomy_exists( $filters['taxonomy'] ) ) {
-				$args['tax_query'] = array(
+				$args['tax_query'] = array( // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_tax_query
 					array(
 						'taxonomy' => sanitize_key( $filters['taxonomy'] ),
 						'field'    => 'term_id',
@@ -297,22 +493,27 @@ class Query {
 					$tax_query[] = array(
 						'taxonomy' => sanitize_key( $taxonomy ),
 						'field'    => 'term_id',
-						'terms'    => array_map( 'absint', $term_ids ),
+						'terms'    => $term_ids,
 					);
 				}
 			}
 			
 			if ( count( $tax_query ) > 1 ) {
-				$args['tax_query'] = $tax_query;
+				$args['tax_query'] = $tax_query; // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_tax_query
 			}
 		}
 		
-		$query           = new \WP_Query( $args );
+		$query           = new WP_Query( $args );
 		$total_attendees = 0;
 		
-		if ( is_array( $query->posts ) && ! empty( $query->posts ) ) {
+		if ( ! empty( $query->posts ) ) {
+			/**
+			 * This is for sure an int, because of 'fields' => 'ids'.
+			 *
+			 * @var int $post_id
+			 */
 			foreach ( $query->posts as $post_id ) {
-				$attendee_count = (int) get_post_meta( $post_id, 'gatherpress_attendee_count', true );
+				$attendee_count = get_post_meta( $post_id, 'gatherpress_attendee_count', true );
 				
 				if ( is_numeric( $attendee_count ) ) {
 					$total_attendees += absint( $attendee_count );

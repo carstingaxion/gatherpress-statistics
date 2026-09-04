@@ -44,7 +44,17 @@ class Support {
 		$supports = get_all_post_type_supports( $post_type );
 		
 		if ( isset( $supports['gatherpress_statistics'] ) && is_array( $supports['gatherpress_statistics'] ) ) {
-			return reset( $supports['gatherpress_statistics'] );
+			$config = reset( $supports['gatherpress_statistics'] );
+
+			if ( is_array( $config ) ) {
+				$normalized_config = array();
+
+				foreach ( $config as $statistic_type => $enabled ) {
+					$normalized_config[ (string) $statistic_type ] = (bool) $enabled;
+				}
+
+				return $normalized_config;
+			}
 		}
 		
 		return array(
@@ -106,12 +116,12 @@ class Support {
 	 *
 	 * @since 0.1.0
 	 *
-	 * @return array<int, string> Array of post type slugs.
+	 * @return string[] Array of post type slugs.
 	 */
 	public function get_supported_post_types(): array {
 		$post_types = get_post_types_by_support( 'gatherpress_statistics' );
 		
-		if ( empty( $post_types ) || ! is_array( $post_types ) ) {
+		if ( empty( $post_types ) ) {
 			return array();
 		}
 		
@@ -140,6 +150,10 @@ class Support {
 	 */
 	public function is_supported_post( int $post_id ): bool {
 		$post = get_post( $post_id );
+
+		if ( ! $post instanceof \WP_Post ) {
+			return false;
+		}
 		
 		return post_type_supports( $post->post_type, 'gatherpress_statistics' ) 
 			&& $post->post_status === 'publish';
@@ -156,7 +170,7 @@ class Support {
 	public function get_post_type_singular_label( string $post_type ): string {
 		$post_type_object = get_post_type_object( $post_type );
 		
-		if ( $post_type_object && isset( $post_type_object->labels->singular_name ) ) {
+		if ( $post_type_object && isset( $post_type_object->labels->singular_name ) && is_string( $post_type_object->labels->singular_name ) ) {
 			return $post_type_object->labels->singular_name;
 		}
 		
@@ -174,7 +188,7 @@ class Support {
 	public function get_post_type_plural_label( string $post_type ): string {
 		$post_type_object = get_post_type_object( $post_type );
 		
-		if ( $post_type_object && isset( $post_type_object->labels->name ) ) {
+		if ( $post_type_object && isset( $post_type_object->labels->name ) && is_string( $post_type_object->labels->name ) ) {
 			return $post_type_object->labels->name;
 		}
 		

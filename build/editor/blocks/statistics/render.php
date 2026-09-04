@@ -15,6 +15,8 @@
  *   selectedTaxonomyTerms?: array<string, mixed>,
  *   countTaxonomy?: string,
  *   filterTaxonomy?: string,
+ *   useContextTerm?: bool,
+ *   contextTaxonomies?: array<int, string>,
  *   eventQuery?: string,
  *   showLabel?: bool,
  *   prefixDefault?: string,
@@ -30,6 +32,44 @@ $label_plural   = isset( $attributes['labelPlural'] ) ? $attributes['labelPlural
 $selected_term  = isset( $attributes['selectedTerm'] ) ? intval( $attributes['selectedTerm'] ) : 0;
 $event_query    = isset( $attributes['eventQuery'] ) ? $attributes['eventQuery'] : 'past';
 $show_label     = isset( $attributes['showLabel'] ) ? $attributes['showLabel'] : true;
+
+// Context-awareness: derive term(s) from the post this block is placed on
+// (a Single Event/Venue template, or the current Query Loop item) instead
+// of a manually picked term.
+$use_context_term  = isset( $attributes['useContextTerm'] ) ? (bool) $attributes['useContextTerm'] : false;
+$context_taxonomies = isset( $attributes['contextTaxonomies'] ) && is_array( $attributes['contextTaxonomies'] )
+	? $attributes['contextTaxonomies']
+	: array();
+
+$context_post_id = 0;
+if ( isset( $block ) && $block instanceof WP_Block && ! empty( $block->context['postId'] ) ) {
+	$context_post_id = absint( $block->context['postId'] );
+} else {
+	$context_post_id = absint( get_queried_object_id() );
+}
+
+// Single-taxonomy path: swap the manually selected term for the one found
+// on the context post, for whichever taxonomy this statistic type actually
+// filters by.
+if ( $use_context_term && $context_post_id > 0 ) {
+	$context_taxonomy = '';
+
+	if ( 'taxonomy_terms_by_taxonomy' === $statistic_type && ! empty( $attributes['filterTaxonomy'] ) ) {
+		$context_taxonomy = $attributes['filterTaxonomy'];
+	} elseif ( ! empty( $attributes['selectedTaxonomy'] ) ) {
+		$context_taxonomy = $attributes['selectedTaxonomy'];
+	}
+
+	if ( ! empty( $context_taxonomy ) ) {
+		$resolved_term = gatherpress_statistics_resolve_context_term( $context_post_id, $context_taxonomy );
+		if ( $resolved_term > 0 ) {
+			$selected_term = $resolved_term;
+		} else {
+			// No term found on the context post for this taxonomy: nothing to filter by.
+			$selected_term = 0;
+		}
+	}
+}
 
 // Prefix and suffix settings
 $prefix_default        = isset( $attributes['prefixDefault'] ) ? $attributes['prefixDefault'] : '';
@@ -82,6 +122,25 @@ if ( 'events_multi_taxonomy' === $statistic_type ) {
 		foreach ( $attributes['selectedTaxonomyTerms'] as $taxonomy => $term_ids ) {
 			if ( ! empty( $term_ids ) && is_array( $term_ids ) ) {
 				$taxonomy_terms[ $taxonomy ] = $term_ids;
+			}
+		}
+	}
+
+	// Any taxonomy listed in contextTaxonomies gets its term resolved from
+	// the context post instead of (or in addition to) a manual selection.
+	if ( $context_post_id > 0 ) {
+		foreach ( $context_taxonomies as $context_taxonomy_slug ) {
+			if ( ! is_string( $context_taxonomy_slug ) || empty( $context_taxonomy_slug ) ) {
+				continue;
+			}
+
+			$resolved_term = gatherpress_statistics_resolve_context_term( $context_post_id, $context_taxonomy_slug );
+
+			if ( $resolved_term > 0 ) {
+				$taxonomy_terms[ $context_taxonomy_slug ] = array( $resolved_term );
+			} else {
+				// No term found on the context post: don't filter by this taxonomy.
+				unset( $taxonomy_terms[ $context_taxonomy_slug ] );
 			}
 		}
 	}

@@ -22,6 +22,14 @@ class Database {
 	use Core\Traits\Singleton;
 
 	/**
+	 * Format for the database table name used by GatherPress statistics.
+	 *
+	 * @since 0.2.0
+	 * @var string $TABLE_FORMAT
+	 */
+	const TABLE_FORMAT = '%sgatherpress_statistics_archive';
+
+	/**
 	 * Constructor.
 	 *
 	 * @since 0.1.0
@@ -50,9 +58,14 @@ class Database {
 	 * @return void
 	 */
 	public function create_archive_table(): void {
+		/**
+		 * Help phpstan understand $wpdb is global.
+		 * 
+		 * @var \wpdb  $wpdb WordPress database abstraction object.
+		 */
 		global $wpdb;
-		
-		$table_name      = $wpdb->prefix . 'gatherpress_statistics_archive';
+
+		$table_name      = sprintf( self::TABLE_FORMAT, $wpdb->prefix );
 		$charset_collate = $wpdb->get_charset_collate();
 		
 		$sql = 
@@ -73,7 +86,10 @@ class Database {
 				KEY filters_lookup (filters_hash)
 				) {$charset_collate};";
 		
-		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+		if ( ! function_exists( 'dbDelta' ) ) {
+			// @phpstan-ignore requireOnce.fileNotFound
+			require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+		}
 		dbDelta( $sql );
 	}
 	
@@ -88,32 +104,38 @@ class Database {
 	 * @return int|null Statistic value or null if not found.
 	 */
 	public function get_archive_statistic( string $statistic_type, array $filters ): ?int {
+		/**
+		 * Help phpstan understand $wpdb is global.
+		 * 
+		 * @var \wpdb  $wpdb WordPress database abstraction object.
+		 */
 		global $wpdb;
-		
+
 		if ( empty( $filters['year'] ) || empty( $filters['month'] ) ) {
 			return null;
 		}
 		
-		$table_name = $wpdb->prefix . 'gatherpress_statistics_archive';
+		$table_name = sprintf( self::TABLE_FORMAT, $wpdb->prefix );
 		
-		// Remove year and month from filters for hash calculation
+		// Remove year and month from filters for hash calculation.
 		$filter_copy = $filters;
 		unset( $filter_copy['year'], $filter_copy['month'] );
-		$filters_hash = md5( wp_json_encode( $filter_copy ) );
+		$filters_hash = md5( (string) wp_json_encode( $filter_copy ) );
 		
 		$post_types = Support::get_instance()->get_supported_post_types();
 		$post_type  = ! empty( $post_types ) ? $post_types[0] : 'gatherpress_event';
 		
-		$result = $wpdb->get_var(
+		$result = $wpdb->get_var( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 			$wpdb->prepare(
-				"SELECT statistic_value FROM {$table_name}
+				'SELECT statistic_value FROM %i
 				 WHERE post_type = %s
 				 AND statistic_type = %s
 				 AND statistic_year = %d
 				 AND statistic_month = %d
 				 AND filters_hash = %s
 				 ORDER BY archived_at DESC
-				 LIMIT 1",
+				 LIMIT 1',
+				$table_name,
 				$post_type,
 				$statistic_type,
 				$filters['year'],

@@ -46,8 +46,8 @@ class Statistics {
 			return 0;
 		}
 
-		$statistic_type = is_string( $statistic_type ) ? $statistic_type : 'total_events';
-		$filters        = is_array( $filters ) ? $filters : array();
+		$statistic_type = ! empty( $statistic_type ) ? $statistic_type : 'total_events';
+		$filters        = ! empty( $filters ) ? $filters : array();
 		
 		if ( empty( $filters['event_query'] ) || ! in_array( $filters['event_query'], array( 'upcoming', 'past' ), true ) ) {
 			return 0;
@@ -80,9 +80,12 @@ class Statistics {
 				$result = Query::get_instance()->count_attendees( $filters );
 				break;
 		}
-		
+
+		/* @phpstan-ignore-next-line */
 		$result = is_numeric( $result ) ? absint( $result ) : 0;
 		
-		return apply_filters( 'gatherpress_stats_calculate_' . $statistic_type, $result, $filters );
+		$return = apply_filters( 'gatherpress_stats_calculate_' . $statistic_type, $result, $filters );
+
+		return is_numeric( $return ) ? absint( $return ) : $result;
 	}
 }

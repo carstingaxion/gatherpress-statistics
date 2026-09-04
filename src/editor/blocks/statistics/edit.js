@@ -50,6 +50,8 @@ import './editor.scss';
  *                                       - {string} selectedTaxonomy - Selected taxonomy slug for single taxonomy filter
  *                                       - {string} countTaxonomy - Taxonomy slug to count terms from
  *                                       - {string} filterTaxonomy - Taxonomy slug to filter by
+ *                                       - {boolean} useContextTerm - Derive the single-taxonomy term from the post this block is placed on
+ *                                       - {string[]} contextTaxonomies - Multi-taxonomy slugs whose term should come from the post this block is placed on
  *                                       - {string} eventQuery - Event query type ('upcoming' or 'past')
  *                                       - {boolean} showLabel - Whether to show the label
  *                                       - {string} prefixDefault - Default prefix text
@@ -72,6 +74,8 @@ export default function Edit( { attributes, setAttributes, clientId } ) {
 		selectedTaxonomy,
 		countTaxonomy,
 		filterTaxonomy,
+		useContextTerm,
+		contextTaxonomies,
 		eventQuery,
 		showLabel,
 		prefixDefault,
@@ -179,7 +183,19 @@ export default function Edit( { attributes, setAttributes, clientId } ) {
 				blockName = __( 'Total Attendees', 'gatherpress-statistics' );
 				break;
 			case 'events_per_taxonomy':
-				if ( selectedTaxonomy && selectedTerm ) {
+				if ( selectedTaxonomy && useContextTerm ) {
+					const taxonomy = filteredTaxonomies?.find(
+						( t ) => t.slug === selectedTaxonomy
+					);
+					blockName = sprintf(
+						/* translators: %s: taxonomy name */
+						__(
+							'%s: current post\u2019s term',
+							'gatherpress-statistics'
+						),
+						taxonomy ? taxonomy.name : labelPlural
+					);
+				} else if ( selectedTaxonomy && selectedTerm ) {
 					const taxonomy = filteredTaxonomies?.find(
 						( t ) => t.slug === selectedTaxonomy
 					);
@@ -209,7 +225,25 @@ export default function Edit( { attributes, setAttributes, clientId } ) {
 				}
 				break;
 			case 'events_multi_taxonomy':
-				if (
+				if ( contextTaxonomies && contextTaxonomies.length > 0 ) {
+					const contextNames = contextTaxonomies
+						.map(
+							( slug ) =>
+								filteredTaxonomies?.find(
+									( t ) => t.slug === slug
+								)?.name || slug
+						)
+						.join( ', ' );
+					blockName = sprintf(
+						/* translators: 1: plural post type label, 2: comma-separated list of taxonomy names */
+						__(
+							'%1$s: %2$s from current post',
+							'gatherpress-statistics'
+						),
+						labelPlural,
+						contextNames
+					);
+				} else if (
 					selectedTaxonomyTerms &&
 					Object.keys( selectedTaxonomyTerms ).length > 0
 				) {
@@ -282,7 +316,23 @@ export default function Edit( { attributes, setAttributes, clientId } ) {
 				}
 				break;
 			case 'taxonomy_terms_by_taxonomy':
-				if ( countTaxonomy && filterTaxonomy && selectedTerm ) {
+				if ( countTaxonomy && filterTaxonomy && useContextTerm ) {
+					const countTax = filteredTaxonomies?.find(
+						( t ) => t.slug === countTaxonomy
+					);
+					const filterTax = filteredTaxonomies?.find(
+						( t ) => t.slug === filterTaxonomy
+					);
+					blockName = sprintf(
+						/* translators: 1: count taxonomy name, 2: filter taxonomy name */
+						__(
+							'%1$s in %2$s: current post\u2019s term',
+							'gatherpress-statistics'
+						),
+						countTax ? countTax.name : countTaxonomy,
+						filterTax ? filterTax.name : filterTaxonomy
+					);
+				} else if ( countTaxonomy && filterTaxonomy && selectedTerm ) {
 					const countTax = filteredTaxonomies?.find(
 						( t ) => t.slug === countTaxonomy
 					);
@@ -353,6 +403,8 @@ export default function Edit( { attributes, setAttributes, clientId } ) {
 		selectedTaxonomy,
 		countTaxonomy,
 		filterTaxonomy,
+		useContextTerm,
+		contextTaxonomies,
 		eventQuery,
 		filteredTaxonomies,
 		allTaxonomyTerms,
@@ -493,6 +545,8 @@ export default function Edit( { attributes, setAttributes, clientId } ) {
 								selectedTaxonomy: '',
 								countTaxonomy: '',
 								filterTaxonomy: '',
+								useContextTerm: false,
+								contextTaxonomies: [],
 							} );
 							// CRITICAL: If switching to total_attendees, set eventQuery to 'past'
 							if ( value === 'total_attendees' ) {
@@ -713,7 +767,26 @@ export default function Edit( { attributes, setAttributes, clientId } ) {
 										} );
 									} }
 								/>
+								{ selectedTaxonomy && (
+									<ToggleControl
+										label={ __(
+											"Use current post's term",
+											'gatherpress-statistics'
+										) }
+										checked={ useContextTerm }
+										onChange={ ( value ) =>
+											setAttributes( {
+												useContextTerm: value,
+											} )
+										}
+										help={ __(
+											'Instead of a fixed term, take the term from the event or venue this block is placed on \u2014 lets the same block be reused across a template.',
+											'gatherpress-statistics'
+										) }
+									/>
+								) }
 								{ selectedTaxonomy &&
+									! useContextTerm &&
 									allTaxonomyTerms[ selectedTaxonomy ] && (
 										<FormTokenField
 											label={ __(
@@ -896,7 +969,26 @@ export default function Edit( { attributes, setAttributes, clientId } ) {
 										'gatherpress-statistics'
 									) }
 								/>
+								{ filterTaxonomy && (
+									<ToggleControl
+										label={ __(
+											"Use current post's term",
+											'gatherpress-statistics'
+										) }
+										checked={ useContextTerm }
+										onChange={ ( value ) =>
+											setAttributes( {
+												useContextTerm: value,
+											} )
+										}
+										help={ __(
+											'Instead of a fixed term, take the filter term from the event or venue this block is placed on.',
+											'gatherpress-statistics'
+										) }
+									/>
+								) }
 								{ filterTaxonomy &&
+									! useContextTerm &&
 									allTaxonomyTerms[ filterTaxonomy ] && (
 										<SelectControl
 											label={ __(
@@ -965,6 +1057,9 @@ export default function Edit( { attributes, setAttributes, clientId } ) {
 										selectedTermIds.includes( term.id )
 									)
 									.map( ( term ) => term.name );
+								const isContextTaxonomy = (
+									contextTaxonomies || []
+								).includes( taxonomy.slug );
 
 								return (
 									<PanelBody
@@ -972,45 +1067,78 @@ export default function Edit( { attributes, setAttributes, clientId } ) {
 										title={ taxonomy.name }
 										initialOpen={ false }
 									>
-										{ taxonomyTerms.length > 0 ? (
-											<FormTokenField
-												label={ __(
-													'Select Terms',
-													'gatherpress-statistics'
-												) }
-												value={ selectedNames }
-												suggestions={ Object.keys(
-													suggestions
-												) }
-												onChange={ ( tokens ) => {
-													const ids = tokens
-														.map(
-															( name ) =>
-																suggestions[
-																	name
-																]?.id
-														)
-														.filter( Boolean );
-													const newSelectedTaxonomyTerms =
-														{
-															...selectedTaxonomyTerms,
-															[ taxonomy.slug ]:
-																ids,
-														};
-													setAttributes( {
-														selectedTaxonomyTerms:
-															newSelectedTaxonomyTerms,
-													} );
-												} }
-											/>
-										) : (
-											<p>
-												{ __(
-													'No terms found',
-													'gatherpress-statistics'
-												) }
-											</p>
-										) }
+										<ToggleControl
+											label={ __(
+												"Use current post's term",
+												'gatherpress-statistics'
+											) }
+											checked={ isContextTaxonomy }
+											onChange={ ( value ) => {
+												const next = value
+													? [
+															...( contextTaxonomies ||
+																[] ),
+															taxonomy.slug,
+													  ]
+													: (
+															contextTaxonomies ||
+															[]
+													  ).filter(
+															( slug ) =>
+																slug !==
+																taxonomy.slug
+													  );
+												setAttributes( {
+													contextTaxonomies: next,
+												} );
+											} }
+											help={ __(
+												'Take this taxonomy\u2019s term from the event or venue this block is placed on, instead of a fixed selection.',
+												'gatherpress-statistics'
+											) }
+										/>
+										{ ! isContextTaxonomy &&
+											taxonomyTerms.length > 0 && (
+												<FormTokenField
+													label={ __(
+														'Select Terms',
+														'gatherpress-statistics'
+													) }
+													value={ selectedNames }
+													suggestions={ Object.keys(
+														suggestions
+													) }
+													onChange={ ( tokens ) => {
+														const ids = tokens
+															.map(
+																( name ) =>
+																	suggestions[
+																		name
+																	]?.id
+															)
+															.filter( Boolean );
+														const newSelectedTaxonomyTerms =
+															{
+																...selectedTaxonomyTerms,
+																[ taxonomy.slug ]:
+																	ids,
+															};
+														setAttributes( {
+															selectedTaxonomyTerms:
+																newSelectedTaxonomyTerms,
+														} );
+													} }
+												/>
+											) }
+										{ ! isContextTaxonomy &&
+											taxonomyTerms.length === 0 && (
+												<p>
+													{ __(
+														'No terms found',
+														'gatherpress-statistics'
+													) }
+												</p>
+											) }
 									</PanelBody>
 								);
 							} ) }

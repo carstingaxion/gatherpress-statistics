@@ -51,8 +51,7 @@ class Cache {
 	 * @return string Cache key.
 	 */
 	public function get_cache_key( string $statistic_type, array $filters = array() ): string {
-		$statistic_type = is_string( $statistic_type ) ? $statistic_type : 'total_events';
-		$filters        = is_array( $filters ) ? $filters : array();
+		$statistic_type = ! empty( $statistic_type ) ? $statistic_type : 'total_events';
 		
 		$key_parts = array( 'gatherpress_stats', $statistic_type );
 		
@@ -61,7 +60,7 @@ class Cache {
 		}
 		
 		if ( ! empty( $filters ) ) {
-			$key_parts[] = md5( wp_json_encode( $filters ) );
+			$key_parts[] = md5( (string) wp_json_encode( $filters ) );
 		}
 		
 		return implode( '_', $key_parts );
@@ -97,12 +96,8 @@ class Cache {
 	 * @return int Statistic value.
 	 */
 	public function get_cached( string $statistic_type, array $filters = array() ): int {
-		if ( ! is_string( $statistic_type ) || empty( $statistic_type ) ) {
+		if ( empty( $statistic_type ) ) {
 			return 0;
-		}
-		
-		if ( ! is_array( $filters ) ) {
-			$filters = array();
 		}
 		
 		if ( ! Support::get_instance()->has_supported_post_types() ) {
@@ -113,7 +108,7 @@ class Cache {
 			return 0;
 		}
 		
-		// Check if archive is enabled and we have year/month filters
+		// Check if archive is enabled and we have year/month filters.
 		if ( Plugin::get_instance()->is_archive_enabled() && ! empty( $filters['year'] ) && ! empty( $filters['month'] ) ) {
 			$archive_value = Database::get_instance()->get_archive_statistic( $statistic_type, $filters );
 			if ( $archive_value !== null ) {
@@ -132,8 +127,6 @@ class Cache {
 		}
 		
 		$value = Statistics::get_instance()->calculate( $statistic_type, $filters );
-		
-		$value = is_numeric( $value ) ? absint( $value ) : 0;
 		
 		\set_transient( $cache_key, $value, $expiration );
 		
@@ -176,15 +169,11 @@ class Cache {
 		
 		$taxonomies = Taxonomy::get_instance()->get_filtered_taxonomies();
 		
-		if ( empty( $taxonomies ) || ! is_array( $taxonomies ) ) {
+		if ( empty( $taxonomies ) ) {
 			return $configs;
 		}
 		
 		foreach ( $taxonomies as $taxonomy ) {
-			if ( ! isset( $taxonomy->name ) ) {
-				continue;
-			}
-			
 			if ( in_array( 'total_taxonomy_terms', $supported_types, true ) ) {
 				$configs[] = array(
 					'type'    => 'total_taxonomy_terms',
@@ -199,12 +188,8 @@ class Cache {
 				)
 			);
 			
-			if ( ! is_wp_error( $terms ) && is_array( $terms ) && ! empty( $terms ) ) {
+			if ( ! is_wp_error( $terms ) && ! empty( $terms ) ) {
 				foreach ( $terms as $term ) {
-					if ( ! isset( $term->term_id ) ) {
-						continue;
-					}
-					
 					foreach ( $event_queries as $event_query ) {
 						$filters = array(
 							'taxonomy'    => $taxonomy->name,
@@ -235,21 +220,17 @@ class Cache {
 		}
 		
 		if ( in_array( 'taxonomy_terms_by_taxonomy', $supported_types, true ) 
-			&& is_array( $taxonomies ) 
 			&& count( $taxonomies ) > 1 ) {
 			$taxonomy_array = array_values( $taxonomies );
+			$taxonomy_count = count( $taxonomy_array );
 			
-			for ( $i = 0; $i < count( $taxonomy_array ); $i++ ) {
-				for ( $j = 0; $j < count( $taxonomy_array ); $j++ ) {
+			for ( $i = 0; $i < $taxonomy_count; $i++ ) {
+				for ( $j = 0; $j < $taxonomy_count; $j++ ) {
 					if ( $i !== $j ) {
 						$filter_tax = $taxonomy_array[ $i ];
 						$count_tax  = $taxonomy_array[ $j ];
-						
-						if ( ! isset( $filter_tax->name ) || ! isset( $count_tax->name ) ) {
-							continue;
-						}
-						
-						$terms = \get_terms(
+
+						$terms = get_terms(
 							array(
 								'taxonomy'   => $filter_tax->name,
 								'hide_empty' => false,
@@ -257,12 +238,8 @@ class Cache {
 							)
 						);
 						
-						if ( ! is_wp_error( $terms ) && is_array( $terms ) && ! empty( $terms ) ) {
+						if ( ! is_wp_error( $terms ) && ! empty( $terms ) ) {
 							foreach ( $terms as $term ) {
-								if ( ! isset( $term->term_id ) ) {
-									continue;
-								}
-								
 								$configs[] = array(
 									'type'    => 'taxonomy_terms_by_taxonomy',
 									'filters' => array(
@@ -294,18 +271,10 @@ class Cache {
 		}
 		
 		$configs = $this->get_common_configs();
-		
-		if ( ! is_array( $configs ) ) {
-			return;
-		}
 
 		$expiration = $this->get_cache_expiration();
 
 		foreach ( $configs as $config ) {
-			if ( ! isset( $config['type'] ) || ! isset( $config['filters'] ) ) {
-				continue;
-			}
-			
 			$cache_key = $this->get_cache_key(
 				$config['type'],
 				$config['filters']
@@ -315,8 +284,6 @@ class Cache {
 				$config['type'],
 				$config['filters']
 			);
-			
-			$value = is_numeric( $value ) ? absint( $value ) : 0;
 			
 			\set_transient( $cache_key, $value, $expiration );
 		}
@@ -331,9 +298,14 @@ class Cache {
 	 * @return void
 	 */
 	public function clear_cache(): void {
+		/**
+		 * Help phpstan understand $wpdb is global.
+		 * 
+		 * @var \wpdb  $wpdb WordPress database abstraction object.
+		 */
 		global $wpdb;
 		
-		$wpdb->query(
+		$wpdb->query( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 			"DELETE FROM {$wpdb->options} 
 			WHERE option_name LIKE '_transient_gatherpress_stats_%' 
 			OR option_name LIKE '_transient_timeout_gatherpress_stats_%'"
