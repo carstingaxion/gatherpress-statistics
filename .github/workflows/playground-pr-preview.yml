@@ -11,7 +11,7 @@ jobs:
       pull-requests: write
     steps:
       - name: Post Playground Preview Button
-        uses: WordPress/action-wp-playground-pr-preview@v2
+        uses: WordPress/action-wp-playground-pr-preview@v3
         with:
           # "append-to-description"  – add the button to the PR description
           # "comment"           – create a new comment with the preview button
